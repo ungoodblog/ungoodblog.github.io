@@ -36,5 +36,19 @@ In the linked material above, you see that the `CR4` register is responsible for
 
 > 20	SMEP  Supervisor Mode Execution Protection Enable	  If set, execution of code in a higher ring generates a fault.
 
+So the 20th bit of the `CR4` indicates whether or not SMEP is enforced. Since this vulnerability we're attacking gives us the ability to overwrite the stack, we're going to utilize a ROP chain consisting only of kernel space gadgets to disable SMEP by placing a new value in `CR4` and then hit our shellcode in userspace. 
+
+## Getting Kernel Base Address
+The first thing we want to do, is to get the base address of the kernel. If we don't get the base address, we can't figure out what the offsets are to our gadgets that we want to use to bypass ASLR. In WinDBG, you can simply run `lm sm` to list all loaded kernel modules alphabetically:
+```
+---SNIP---
+fffff800`10c7b000 fffff800`1149b000   nt
+---SNIP---
+```
+
+Again, just following along with Abatchy's blog, we can find the first gadget (actually the 2nd in our code) by locating a gadget that allows us to place a value into `cr4` easily and then takes a `ret` soon after. Luckily for us, this gadget exists inside of `nt!HvlEndSystemInterrupt`. 
+
+We can find it in WinDBG with the following:
+```
 
 ## Conclusion
