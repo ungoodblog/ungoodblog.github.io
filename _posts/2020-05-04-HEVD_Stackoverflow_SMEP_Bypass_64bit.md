@@ -135,7 +135,7 @@ You could use a lot of the cool `string` functions in C++ to easily get the base
 ## Hunting Gadgets
 The value of these gadgets is that they reside in kernel space so SMEP can't interfere here. We can place them directly on the stack and overwrite `rip` so that we are always executing the first gadget and then returning to the stack where our ROP chain resides without ever going into user space. (If you have a preferred method for gadget hunting in the kernel let me know, I tried to script some things up in WinDBG but didn't get very far before I gave up after it was clear it was super inefficient.) Original work on the gadget locations as far as I know is located here: http://blog.ptsecurity.com/2012/09/bypassing-intel-smep-on-windows-8-x64.html
 
-Again, just following along with Abatchy's blog, we can find the first gadget (actually the 2nd in our code) by locating a gadget that allows us to place a value into `cr4` easily and then takes a `ret` soon after. Luckily for us, this gadget exists inside of `nt!HvlEndSystemInterrupt`. 
+Again, just following along with Abatchy's blog, we can find **Gadget 1** (actually the 2nd in our code) by locating a gadget that allows us to place a value into `cr4` easily and then takes a `ret` soon after. Luckily for us, this gadget exists inside of `nt!HvlEndSystemInterrupt`. 
 
 We can find it in WinDBG with the following:
 ```
@@ -168,7 +168,7 @@ As Abatchy did, I've added a comment so you can see the gadget we're after. We w
 `ret`
 routine because if we can place an arbitrary value into `rcx`, there is a second gadget which allows us to `mov cr4, rcx` and then we'll have everything we need. 
 
-Gadget 2 is nested within the `KiEnableXSave` kernel routine as follows (with some snipping) in WinDBG:
+**Gadget 2** is nested within the `KiEnableXSave` kernel routine as follows (with some snipping) in WinDBG:
 ```
 kd> uf nt!KiEnableXSave
 nt!KiEnableXSave:
@@ -188,3 +188,22 @@ So with these two gadgets locations known to us, as in, we know their offsets re
 + our `mov cr4, rcx` gadget
 + pointer to our shellcode.
 
+So for those following along at home, we will overwrite `rip` with our first gadget, it will pop the first 8 byte value on the stack into `rcx`. What value is that? Well, it's the value that we want `cr4` to hold eventually and we can simply place it onto the stack with our stack overflow. So we will pop that value into `rcx` and then the gadget will hit a `ret` opcode which will send the `rip` to our second gadget which will `mov cr4, rcx` so that `cr4` now holds the SMEP-disabled value we want. The gadget will then hit a `ret` opcode and return `rip` to where? To a pointer to our userland shellcode that it will now run seemlessly because SMEP is disabled. 
+
+You can see this implemented in code here:
+```
+ BYTE input_buff[2088] = { 0 };
+
+    INT64 pop_rcx_offset = kernel_base + 0x146580; // gadget 1
+    cout << "[>] POP RCX gadget located at: 0x" << pop_rcx_offset << endl;
+    INT64 rcx_value = 0x70678; // value we want placed in cr4
+    INT64 mov_cr4_offset = kernel_base + 0x3D6431; // gadget 2
+    cout << "[>] MOV CR4, RCX gadget located at: 0x" << mov_cr4_offset << endl;
+
+
+    memset(input_buff, '\x41', 2056);
+    memcpy(input_buff + 2056, (PINT64)&pop_rcx_offset, 8); // pop rcx
+    memcpy(input_buff + 2064, (PINT64)&rcx_value, 8); // disable SMEP value
+    memcpy(input_buff + 2072, (PINT64)&mov_cr4_offset, 8); // mov cr4, rcx
+    memcpy(input_buff + 2080, (PINT64)&shellcode_addr, 8); // shellcode
+```
