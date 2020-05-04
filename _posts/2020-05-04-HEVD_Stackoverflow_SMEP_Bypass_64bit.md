@@ -191,7 +191,7 @@ So with these two gadgets locations known to us, as in, we know their offsets re
 So for those following along at home, we will overwrite `rip` with our first gadget, it will pop the first 8 byte value on the stack into `rcx`. What value is that? Well, it's the value that we want `cr4` to hold eventually and we can simply place it onto the stack with our stack overflow. So we will pop that value into `rcx` and then the gadget will hit a `ret` opcode which will send the `rip` to our second gadget which will `mov cr4, rcx` so that `cr4` now holds the SMEP-disabled value we want. The gadget will then hit a `ret` opcode and return `rip` to where? To a pointer to our userland shellcode that it will now run seemlessly because SMEP is disabled. 
 
 You can see this implemented in code here:
-```
+```cpp
  BYTE input_buff[2088] = { 0 };
 
     INT64 pop_rcx_offset = kernel_base + 0x146580; // gadget 1
