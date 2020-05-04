@@ -32,7 +32,8 @@ Taking my cues from Abatchy, I decided to try and bypass SMEP by using a well-kn
 
 In the linked material above, you see that the `CR4` register is responsible for enforcing this protection and if we look at [Wikipedia](https://en.wikipedia.org/wiki/Control_register#SMEP), we can get a complete breakdown of CR4 and what its responsibilities are: 
 
-> "20	SMEP	Supervisor Mode Execution Protection Enable	If set, execution of code in a higher ring generates a fault."
+> Bit Name  Fullname                                      Description
+> 20	SMEP  Supervisor Mode Execution Protection Enable	  If set, execution of code in a higher ring generates a fault.
 
 
 ## Conclusion
