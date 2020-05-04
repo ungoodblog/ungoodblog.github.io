@@ -20,12 +20,19 @@ This is going to be my last HEVD blog post. This was all of the exploits I wante
 ## Thanks
 - To [@Cneelis](https://twitter.com/Cneelis) for having such great shellcode in his similar exploit on a different Windows 10 build here: https://github.com/Cn33liz/HSEVD-StackOverflowX64/blob/master/HS-StackOverflowX64/HS-StackOverflowX64.c 
 - To [@abatchy17](https://twitter.com/abatchy17) for his awesome blog post on his SMEP bypass here: https://www.abatchy.com/2018/01/kernel-exploitation-4
+- To [@ihack4falafel](https://twitter.com/ihack4falafel) for helping me figure out where to return to after running my shellcode.
 
 And as this is the last HEVD blog post, thanks to everyone who got me this far. As I've said every post so far, nothing I was doing is my own idea or technique, was simply recreating their exploits (or at least trying to) in order to learn more about the bug classes and learn more about the Windows kernel. (More thoughts on this later in a future blog post). 
 
 ## SMEP
 We've already completed a Stack Overflow exploit for HEVD on Windows 7 x64 [here](https://h0mbre.github.io/HEVD_Stackoverflow_64bit/); however, the problem is that starting with Windows 8, Microsoft implemented a new mitigation by default called Supervisor Mode Execution Prevention ([SMEP](https://web.archive.org/web/20160803075007/https://www.ncsi.com/nsatc11/presentations/wednesday/emerging_technologies/fischer.pdf)). SMEP detects kernel mode code running in userspace stops us from being able to hijack execution in the kernel and send it to our shellcode pointer residing in userspace.
 
+## Bypassing SMEP
+Taking my cues from Abatchy, I decided to try and bypass SMEP by using a well-known ROP chain technique that utilizes segments of code in the kernel to disable SMEP and **then** heads to user space to call our shellcode. 
+
+In the linked material above, you see that the `CR4` register is responsible for enforcing this protection and if we look at [Wikipedia](https://en.wikipedia.org/wiki/Control_register#SMEP), we can get a complete breakdown of CR4 and what its responsibilities are: 
+
+> "20	SMEP	Supervisor Mode Execution Protection Enable	If set, execution of code in a higher ring generates a fault."
 
 
 ## Conclusion
