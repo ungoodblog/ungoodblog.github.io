@@ -133,6 +133,7 @@ This code imports `NtQuerySystemInformation` from `nt.dll` and allows us to use 
 You could use a lot of the cool `string` functions in C++ to easily get the base address of any kernel mode driver as long as you have the name of the `.sys` file. You could cast the `Modules.Name` member to a string and do a substring match routine to locate your desired driver as you iterate through the array and return the base address. So now that we have the base address figured out, we can move on to hunting the gadgets.
 
 ## Hunting Gadgets
+The value of these gadgets is that they reside in kernel space so SMEP can't interfere here. We can place them directly on the stack and overwrite `rip` so that we are always executing the first gadget and then returning to the stack where our ROP chain resides without ever going into user space. (If you have a preferred method for gadget hunting in the kernel let me know, I tried to script some things up in WinDBG but didn't get very far before I gave up after it was clear it was super inefficient.) Original work on the gadget locations as far as I know is located here: http://blog.ptsecurity.com/2012/09/bypassing-intel-smep-on-windows-8-x64.html
 
 Again, just following along with Abatchy's blog, we can find the first gadget (actually the 2nd in our code) by locating a gadget that allows us to place a value into `cr4` easily and then takes a `ret` soon after. Luckily for us, this gadget exists inside of `nt!HvlEndSystemInterrupt`. 
 
@@ -156,12 +157,26 @@ fffff800`10dc157c 0f30            wrmsr
 nt!HvlEndSystemInterrupt+0x1e:
 fffff800`10dc157e 5a              pop     rdx
 fffff800`10dc157f 58              pop     rax
-fffff800`10dc1580 59              pop     rcx								// Gadget at offset from nt: +0x146580
+fffff800`10dc1580 59              pop     rcx // Gadget at offset from nt: +0x146580
 fffff800`10dc1581 c3              ret
 ```
 
 As Abatchy did, I've added a comment so you can see the gadget we're after. We want this:
+
 `pop rcx`
 
 `ret`
-routine because if we can place an arbitrary value into `rcx`, there is a second gadget which allows us to `mov cr4, rcx` and then we'd have everything we need. 
+routine because if we can place an arbitrary value into `rcx`, there is a second gadget which allows us to `mov cr4, rcx` and then we'll have everything we need. 
+
+Gadget 2 is nested within the `KiEnableXSave` kernel routine as follows (with some snipping) in WinDBG:
+```
+kd> uf nt!KiEnableXSave
+nt!KiEnableXSave:
+
+---SNIP---
+
+nt! ?? ::OKHAJAOM::`string'+0x32fc:
+fffff800`1105142c 480fbaf112      btr     rcx,12h
+fffff800`11051431 0f22e1          mov     cr4,rcx // Gadget at offset from nt: +0x3D6431
+fffff800`11051434 c3              ret
+```
