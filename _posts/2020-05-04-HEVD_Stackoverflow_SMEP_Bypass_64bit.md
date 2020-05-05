@@ -30,9 +30,7 @@ We've already completed a Stack Overflow exploit for HEVD on Windows 7 x64 [here
 ## Bypassing SMEP
 Taking my cues from Abatchy, I decided to try and bypass SMEP by using a well-known ROP chain technique that utilizes segments of code in the kernel to disable SMEP and **then** heads to user space to call our shellcode. 
 
-In the linked material above, you see that the `CR4` register is responsible for enforcing this protection and if we look at [Wikipedia](https://en.wikipedia.org/wiki/Control_register#SMEP), we can get a complete breakdown of CR4 and what its responsibilities are: 
-
-> Bit Name  Fullname                                      Description
+In the linked material above, you see that the `CR4` register is responsible for enforcing this protection and if we look at [Wikipedia](https://en.wikipedia.org/wiki/Control_register#SMEP), we can get a complete breakdown of CR4 and what its responsibilities are:
 
 > 20	SMEP  Supervisor Mode Execution Protection Enable	  If set, execution of code in a higher ring generates a fault.
 
