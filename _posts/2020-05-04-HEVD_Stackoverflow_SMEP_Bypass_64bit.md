@@ -215,4 +215,5 @@ So if `cr4` holds this value, SMEP should be disabled.
 
 ## Restoring Execution
 The hardest part of this exploit for me was restoring execution after the shellcode ran. Unfortunately, our exploit overwrites several register values and corrupts our stack quite a bit. When my shellcode is done running (not really **my** shellcode, its borrowed from @Cneelis), this is what my callstack looked like along with my stack memory values:
-![](/assets/images/AWE/execution.PNG)
+
+![](/assets/images/AWE/execution.png)
