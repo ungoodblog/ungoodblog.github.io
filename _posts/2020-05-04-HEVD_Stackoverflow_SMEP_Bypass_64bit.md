@@ -229,6 +229,8 @@ Anyways, my hacky way of tracing through normally sized buffers and taking notes
 ## Conclusion
 All in all, the ROP chain to disable SMEP via `cr4` wasn't too complicated, this could even serve as introduction to ROP chains for some in my opinion because as far as ROP chains go this is fairly straightforward; however, restoring execution after our shellcode was a nightmare for me. A lot of time wasted by misinterpreting the callstack readouts from WinDBG (a lesson learned). As @ihack4falafel says, make sure you keep an eye on `@rsp` in your memory view in WinDBG anytime you are messing with the stack. 
 
+![](/assets/images/AWE/systemsmep.PNG)
+
 Thanks again to all the bloggers who got me through the HEVD exploits:
 + [FuzzySec](https://twitter.com/FuzzySec)
 + [r0oki7](https://twitter.com/r0otki7)
