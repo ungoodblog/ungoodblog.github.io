@@ -15,7 +15,7 @@ tags:
 ---
 
 ## Introduction
-This is going to be my last HEVD blog post. This was all of the exploits I wanted to hit when I started this goal in late January. We did quite a few, there are some definitely interesting ones left on the table and there is all of the Linux exploits as well. I'll speak more about future posts in a future post (haha). I used [Hacksys Extreme Vulnerable Driver 2.0](https://github.com/hacksysteam/HackSysExtremeVulnerableDriver) and Windows 10 Build 14393.rs1_release.160715-1616 for this exploit. Some of the newer Windows 10 builds were bugchecking this technique and weren't allowing me to complete it. 
+This is going to be my last HEVD blog post. This was all of the exploits I wanted to hit when I started this goal in late January. We did quite a few, there are some definitely interesting ones left on the table and there is all of the Linux exploits as well. I'll speak more about future posts in a future post (haha). I used [Hacksys Extreme Vulnerable Driver 2.0](https://github.com/hacksysteam/HackSysExtremeVulnerableDriver) and Windows 10 Build 14393.rs1_release.160715-1616 for this exploit. Some of the newer Windows 10 builds were bugchecking this technique.
 
 All of the exploit code can be found [here](https://github.com/h0mbre/Windows-Exploits/tree/master/Exploit-Code/HEVD).
 
