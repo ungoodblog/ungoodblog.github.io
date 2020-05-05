@@ -217,3 +217,23 @@ So if `cr4` holds this value, SMEP should be disabled.
 The hardest part of this exploit for me was restoring execution after the shellcode ran. Unfortunately, our exploit overwrites several register values and corrupts our stack quite a bit. When my shellcode is done running (not really **my** shellcode, its borrowed from @Cneelis), this is what my callstack looked like along with my stack memory values:
 
 ![](/assets/images/AWE/execution.png)
+
+Restoring execution will always be pretty specific to what version of HEVD you're using and also perhaps what build of Windows you're on as the some of the kernel routines will change, so I won't go too much in depth here. But, what I did to figure out why I kept crashing so much after returning to the address in the screenshot of `HEVD!IrpDeviceIoCtlHandler+0x19f` which is located in the right hand side of the screenshot at `ffff9e8196b99158`, is that `rsi` is typically zero'd out if you send regular sized buffers to the driver routine.
+
+So if you were to send a non-overflowing buffer, and put a breakpoint at `nt!IopSynchronousServiceTail+0x1a0` (which is where `rip` would return if we took a `ret` out our address of `ffff9e8196b99158`), you would see that `rsi` is typically `0` when normally system service routines are exiting so when I returned, I had to have an `rsi` value of `0` in order to stop from getting an exception.
+
+I tried just following the code through until I reached an exception with a non-zero `rsi` but wasn't able to pinpoint exactly where the fault occurs or why. The debug information I got from all my bugchecks didn't bring me any closer to the answer (probably user error). I noticed that if you don't null out `rsi` before returning, `rsi` wouldn't be referenced in any way until a value was popped into it from the stack which happened to be our `IOCTL` code, so this confused me even more. 
+
+Anyways, my hacky way of tracing through normally sized buffers and taking notes of the register values at the same point we return to out of our shellcode did work, but I'm still unsure why 😒. 
+
+## Conclusion
+All in all, the ROP chain to disable SMEP via `cr4` wasn't too complicated, this could even serve as introduction to ROP chains for some in my opinion because as far as ROP chains go this is fairly straightforward; however, restoring execution after our shellcode was a nightmare for me. A lot of time wasted by misinterpreting the callstack readouts from WinDBG (a lesson learned). As @ihack4falafel says, make sure you keep an eye on `@rsp` in your memory view in WinDBG anytime you are messing with the stack. 
+
+Thanks again to all the bloggers who got me through the HEVD exploits:
++ [FuzzySec](https://twitter.com/FuzzySec)
++ [r0oki7](https://twitter.com/r0otki7)
++ [Tekwizz123](https://twitter.com/tekwizz123)
++ Abatchy
++ everyone else I've referenced in previous posts!
+
+Huge thanks to [HackSysTeam](https://twitter.com/HackSysTeam) for developing the driver for us to all practice on, can't wait to tackle it on Linux!
