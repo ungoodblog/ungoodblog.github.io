@@ -207,3 +207,12 @@ You can see this implemented in code here:
     memcpy(input_buff + 2072, (PINT64)&mov_cr4_offset, 8); // mov cr4, rcx
     memcpy(input_buff + 2080, (PINT64)&shellcode_addr, 8); // shellcode
 ```
+
+## CR4 Value
+Again, just following along with Abatchy, I'll go ahead and place the value `0x70678` into `cr4`. In binary, `1110000011001111000` which would mean that the 20th bit, the SMEP bit, is set to `0`. You can read more about what values to input here on j00ru's [blog post about SMEP](https://j00ru.vexillium.org/2011/06/smep-what-is-it-and-how-to-beat-it-on-windows/). 
+
+So if `cr4` holds this value, SMEP should be disabled. 
+
+## Restoring Execution
+The hardest part of this exploit for me was restoring execution after the shellcode ran. Unfortunately, our exploit overwrites several register values and corrupts our stack quite a bit. When my shellcode is done running (not really **my** shellcode, its borrowed from @Cneelis), this is what my callstack looked like along with my stack memory values:
+![](/assets/images/AWE/execution.PNG)
