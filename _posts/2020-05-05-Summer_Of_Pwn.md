@@ -26,4 +26,6 @@ I will be keeping a daily log of everything I do and will publish it so those tr
 
 I'm taking a purposeful break from blogging so that I can focus on leveling up. Blogging takes a lot of my time and it's interfering with my ability to put hours into getting better. I will hopefully be able to do a write-up detailing how I exploited a bug I found in another Windows kernel mode driver.
 
+Keeping track of the Linux pwn challenge exploits [here](https://github.com/h0mbre/Summer_of_PWN). 
+
 Until then, see you on the other side!
