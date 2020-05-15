@@ -1126,9 +1126,9 @@ sys     2m2.098s
 ```
 
 ### Summary of Results
-C++ Fuzzer -- 310 iterations/sec
-C Fuzzer -- 329 iterations/sec (+ 6%)
-C Fuzzer 2.0 -- 392 iterations/sec (+ 26%)
++ C++ Fuzzer -- 310 iterations/sec
++ C Fuzzer -- 329 iterations/sec (**+ 6%**)
++ C Fuzzer 2.0 -- 392 iterations/sec (**+ 26%**)
 
 Thanks to @lcamtuf and [@carste1n](https://twitter.com/carste1n) for the help. 
 
