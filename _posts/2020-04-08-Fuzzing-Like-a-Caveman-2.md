@@ -1006,3 +1006,130 @@ For some fun, let's compare our original fuzzer's performance for 50,000 iterati
 As you can see, 6,243 seconds is significantly slower than our C++ fuzzer benchmark of 170 seconds.
 
 ## Addendum 15/May/2020
+Just playing around with porting the C++ fuzzer to C and I made some modest improvements on my own. One of the logic changes I made was to collect the data from the original valid image only once and then copy that data into a newly allocated buffer each fuzzing iteration and then do the mutation operations on the newly allocated buffer. This C version of basically the same C++ fuzzer performed pretty well compared to the C++ fuzzer. Here is a comparison between the two for `200,000` iterations (you can ignore the crash findings as this fuzzer is extremely dumb and 100% random):
+```
+h0mbre:~$ time ./cppfuzz Canon_40D.jpg 200000
+<snipped_results>
+
+real    10m45.371s
+user    7m14.561s
+sys     3m10.529s
+
+h0mbre:~$ time ./cfuzz Canon_40D.jpg 200000
+<snipped_results>
+
+real    10m7.686s
+user    7m27.503s
+sys     2m20.843s
+```
+
+So, over `200,000` iterations we end up saving about 35-40 seconds. This was pretty typical in my testing. So just by the few logic changes and using less C++-provided abstractions we saved a lot of `sys` time. We increased speed by about 5%. 
+
+### Monitoring Child Process Exit Status
+After completing the C translation, I went to Twitter to ask for suggestions about performance improvements. [@lcamtuf](https://twitter.com/lcamtuf), the creator of AFL, explained to me that I shouldn't be using `popen()` in my code as it spawns a shell and performs abysmally. Here is the code segment I asked for help on:
+```c
+void exif(int iteration) {
+    
+    FILE *fileptr;
+    
+    //fileptr = popen("exif_bin target.jpeg -verbose >/dev/null 2>&1", "r");
+    fileptr = popen("exiv2 pr -v mutated.jpeg >/dev/null 2>&1", "r");
+
+    int status = WEXITSTATUS(pclose(fileptr));
+    switch(status) {
+        case 253:
+            break;
+        case 0:
+            break;
+        case 1:
+            break;
+        default:
+            crashes++;
+            printf("\r[>] Crashes: %d", crashes);
+            fflush(stdout);
+            char command[50];
+            sprintf(command, "cp mutated.jpeg ccrashes/crash.%d.%d",
+             iteration,status);
+            system(command);
+            break;
+    }
+}
+``` 
+As you can see, we use `popen()`, run a shell-command, and then close the file pointer to the child process and return the exit-status for monitoring with the `WEXITSTATUS` macro. I was filtering out some exit codes that I didn't care about like `253`, `0`, and `1`, and was hoping to see some related to the floating point errors we already found with our C++ fuzzer or maybe even a segfault. `@lcamtuf` suggested that instead of `popen()`, I call `fork()` to spawn a child process, `execvp()` to have the child process execute a command, and then finally use `waitpid()` to await the child process termination and return the exit status. 
+
+Since we don't have a proper shell in this syscall path, I had to also open a handle to `/dev/null` and call `dup2()` to route both `stdout` and `stderr` there as we don't care about the command output. I also used the `WTERMSIG` macro to retrieve the signal that terminated the child process in the event that the `WIFSIGNALED` macro returned true, which would indicate we got a segfault or floating point exception, etc. So now, our updated function looks like this:
+```c
+void exif(int iteration) {
+    
+    char* file = "exiv2";
+    char* argv[4];
+    argv[0] = "pr";
+    argv[1] = "-v";
+    argv[2] = "mutated.jpeg";
+    argv[3] = NULL;
+    pid_t child_pid;
+    int child_status;
+
+    child_pid = fork();
+    if (child_pid == 0) {
+        // this means we're the child process
+        int fd = open("/dev/null", O_WRONLY);
+
+        // dup both stdout and stderr and send them to /dev/null
+        dup2(fd, 1);
+        dup2(fd, 2);
+        close(fd);
+
+        execvp(file, argv);
+        // shouldn't return, if it does, we have an error with the command
+        printf("[!] Unknown command for execvp, exiting...\n");
+        exit(1);
+    }
+    else {
+        // this is run by the parent process
+        do {
+            pid_t tpid = waitpid(child_pid, &child_status, WUNTRACED |
+             WCONTINUED);
+            if (tpid == -1) {
+                printf("[!] Waitpid failed!\n");
+                perror("waitpid");
+            }
+            if (WIFEXITED(child_status)) {
+                //printf("WIFEXITED: Exit Status: %d\n", WEXITSTATUS(child_status));
+            } else if (WIFSIGNALED(child_status)) {
+                crashes++;
+                int exit_status = WTERMSIG(child_status);
+                printf("\r[>] Crashes: %d", crashes);
+                fflush(stdout);
+                char command[50];
+                sprintf(command, "cp mutated.jpeg ccrashes/%d.%d", iteration, 
+                exit_status);
+                system(command);
+            } else if (WIFSTOPPED(child_status)) {
+                printf("WIFSTOPPED: Exit Status: %d\n", WSTOPSIG(child_status));
+            } else if (WIFCONTINUED(child_status)) {
+                printf("WIFCONTINUED: Exit Status: Continued.\n");
+            }
+        } while (!WIFEXITED(child_status) && !WIFSIGNALED(child_status));
+    }
+}
+```
+
+You can see that this drastically improves performance for our `200,000` iteration benchmark:
+```
+root@kali:~# time ./cfuzz2 Canon_40D.jpg 200000
+<snipped_results>
+
+real    8m30.371s
+user    6m10.219s
+sys     2m2.098s
+```
+
+### Summary of Results
+C++ Fuzzer -- 310 iterations/sec
+C Fuzzer -- 329 iterations/sec (+ 6%)
+C Fuzzer 2.0 -- 392 iterations/sec (+ 26%)
+
+Thanks to @lcamtuf and [@carste1n](https://twitter.com/carste1n) for the help. 
+
+I've uploaded the code here: https://github.com/h0mbre/Fuzzing/tree/master/JPEGMutation
