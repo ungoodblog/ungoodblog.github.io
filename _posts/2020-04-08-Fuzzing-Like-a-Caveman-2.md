@@ -1119,7 +1119,7 @@ void exif(int iteration) {
 
 You can see that this drastically improves performance for our `200,000` iteration benchmark:
 ```
-root@kali:~# time ./cfuzz2 Canon_40D.jpg 200000
+h0mbre:~$ time ./cfuzz2 Canon_40D.jpg 200000
 <snipped_results>
 
 real    8m30.371s
