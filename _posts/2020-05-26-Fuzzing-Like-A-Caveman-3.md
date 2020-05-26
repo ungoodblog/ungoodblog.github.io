@@ -410,5 +410,6 @@ Segmentation fault
 So feeding the vulnerable program one of the crash inputs actually does crash it. Cool. 
 
 ***Disclaimer***
+
 Here is where some math comes in, and I'm not guaranteeing this math is correct. I even sought help from some really smart people like [@Firzen14](https://twitter.com/Firzen14) and am still not 100% confident in the math lol. But! I did go ahead and simulate the systems involved here hundreds of millions of times and the results of the empirical data were super close to what the possibly broken math said it should be. So, if it's not correct, its at least close enough to prove the points I'm trying to demonstrate.
 ***Disclaimer***
