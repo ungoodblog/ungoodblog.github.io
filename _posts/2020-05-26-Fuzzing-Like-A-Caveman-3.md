@@ -395,7 +395,7 @@ h0mbre@pwn:~/fuzzing$ ./fuzzer Canon_40D.jpg 1000000
 [>] Fuzzing completed, exiting...
 ```
 
-So out of 1 million iterations, we got 88 crashes. So on about %.0088 of our iterations, we met the criteria to pass check 1 and hit the vulnerable function. Let's double check our crash to make sure there's no error in any of our code (I fuzzed the vulnerable program with all checks enabled in QEMU mode (to simulate not having source code) with AFL for 14 hours and wasn't able to crash the program so I hope there are no bugs I don't know about 😬).
+So out of 1 million iterations, we got 88 crashes. So on about %.0088 of our iterations, we met the criteria to pass check 1 and hit the vulnerable function. Let's double check our crash to make sure there's no error in any of our code (I fuzzed the vulnerable program with all checks enabled in QEMU mode (to simulate not having source code) with AFL for 14 hours and wasn't able to crash the program so I hope there are no bugs that I don't know about 😬).
 ```
 h0mbre@pwn:~/fuzzing/ccrashes$ vuln 998636.11 
 [>] Analyzing file: 998636.11.
@@ -409,7 +409,74 @@ Segmentation fault
 
 So feeding the vulnerable program one of the crash inputs actually does crash it. Cool. 
 
-***Disclaimer***
+***Disclaimer***: Here is where some math comes in, and I'm not guaranteeing this math is correct. I even sought help from some really smart people like [@Firzen14](https://twitter.com/Firzen14) and am still not 100% confident in my math lol. But! I did go ahead and simulate the systems involved here hundreds of millions of times and the results of the empirical data were super close to what the possibly broken math said it should be. So, if it's not correct, its at least close enough to prove the points I'm trying to demonstrate.
 
-Here is where some math comes in, and I'm not guaranteeing this math is correct. I even sought help from some really smart people like [@Firzen14](https://twitter.com/Firzen14) and am still not 100% confident in the math lol. But! I did go ahead and simulate the systems involved here hundreds of millions of times and the results of the empirical data were super close to what the possibly broken math said it should be. So, if it's not correct, its at least close enough to prove the points I'm trying to demonstrate.
-***Disclaimer***
+Let's try and figure out how likely it is that we pass the first check and get a crash. The first obstacle we need to pass is that we need index `2626` to be chosen for mutation. If it's not mutated, we know that by default its not going to hold the value we need it to hold and we won't pass the check. Since we're selecting a byte to be mutated 159 times, and we have 7958 bytes to choose from, the odds of us mutating the byte at index `2626` is probably something close to `159/7958` which is `0.0199798944458407`. 
+
+The second obstacle, is that we need it to hold exactly `\x6c` and the fuzzer has 255 byte values to choose from. So the chances of this byte, once selected for mutation, to be mutated to exactly `\x6c` is `1/255`, which is `0.003921568627451`. 
+
+So the chances of both of these things occurring should be close to `0.0199798944458407` * `0.003921568627451`, (about .0078%), which if you multiply by 1 million, would have you at around 78 crashes. We were pretty close to that with 88. Given that we're doing this randomly, there is going to be some variance.
+
+So in conclusion for Experiment 1, we were able to reliably pass this one type of check and reach our vulnerable function with our dumb fuzzer. Let's see how things change when add a second check.
+
+## Experiment 2: Passing Two Checks
+Here is where the math becomes an even bigger problem; however, as I said previously, I ran a simulation of the events hundreds of millions of times and was pretty close to what I thought *should* be the math. 
+
+Having the byte value be correct is fairly straightforward *I think* and is always going to be 1/255, but having both indexes selected for mutation with only 159 choices available tripped me up. I ran a simulator to see how often it occurred that both indexes were selected for mutation and let it run for a while, after over 390 million iterations, it happened around 155,000 times total. 
+```
+<snip>
+Occurences: 155070    Iterations: 397356879
+Occurences: 155080    Iterations: 397395052
+Occurences: 155090    Iterations: 397422769
+<snip>
+```
+
+`155090/397422769` == `.0003902393423261565`. I would think the math is something close to `(159/7958) * (158/7958)`, which would end up being `.0003966855142551934`. So you can see that they're pretty close, given some random variance, they're not too far off. This should be close enough to demonstrate the problem. 
+
+Now that we have to pass two checks, we can mathematically summarize the odds of this happening with our dumb fuzzer as follows:
+```
+((159/7958) * (1/255)) == odds to pass first check
+odds to pass first check * (158/7958) == odds to pass first check and have second index targeted for mutation
+odds to pass first check * ((158/7958) * (1/255)) == odds to have second index targeted for mutation and hold the correct value
+((159/7958) * (1/255)) * ((158/7958) * (1/255)) == odds to pass both checks
+((0.0199798944458407 * 0.003921568627451‬) * (0.0198542347323448 * 0.003921568627451)) == 6.100507716342904e-9
+```
+
+So the odds of us getting both indexes selected for mutation and having both indexes mutated to hold the needed value is around `.000000006100507716342904`, which is `.0000006100507716342904%`. 
+
+For one check enabled, we should've expected ONE crash every ~12,820 iterations.
+
+For two checks enabled, we should expect ONE crash every **~163 million iterations.**
+
+This is quite the problem. Our fuzzer would need to run for a very long time to reach that many iterations on average. As written and performing in a VM, the fuzzer does roughly 1,600 iterations a second. It would take me about 28 hours to reach 163 million iterations. You can see how our chances of finding the bug decreased exponentionally with just one more check enabled. Imagine a third check being added! 
+
+## How Code Coverage Tracking Can Help Us
+If our fuzzer was able to track code coverage, we could turn this problem into something much more manageable. 
+
+Generically, a code coverage tracking system in our fuzzer would keep track of what inputs reached new code in the application. There are many ways to do this. Sometimes when source code is available to you, you can recompile the binaries with instrumentation added that informs the fuzzer when new code is reached, you can also use emulation, @gamazolabs has a really cool Windows userland code coverage system that leverages an extremely fast debugger that sets millions of breakpoints in a target binary and slowly removes breakpoints as they are reached called '[mesos](https://github.com/gamozolabs/mesos)'. Once your fuzzer becomes aware that a mutated input reached new code, it would save that input off so that it can be re-used and mutated further to reach even more code. That is a very simple explanation, but hopefully it paints a clear picture. 
+
+I haven't yet implemented a code coverage technique for the fuzzer, but we can easily simulate one. Let's say our fuzzer was able, 1 out of ~13,000 times, to pass the first check and reach that second check in the program. 
+
+The first time the input reached this second check, it would be considered new code coverage. As a result, our now smart fuzzer would save that input off as it caused new code to be reached. This input would then be fed back through the mutator and hopefully reach the same new code again with the added possibility of reaching even more code. 
+
+Let's demonstrate this. Let's doctor our file `Canon_40D.jpg` such that the byte at the `2626` index is `\x6c`, and feed it through to our vulnerable application. 
+```
+h0mbre@pwn:~/fuzzing$ vuln Canon_altered.jpg 
+[>] Analyzing file: Canon_altered.jpg.
+[>] Canon_altered.jpg is 7958 bytes.
+[>] Check 1 no.: 2626
+[>] Check 2 no.: 3979
+[>] Check 2 failed.
+```
+
+As you can see, we passed the first check and failed on the second check. Let's use this `Canon_altered.jpg` file now as our base input that we use for mutation simulating the fact that we have code coverage tracking in our fuzzer and see how many crashes we get when there are only testing for two checks total. 
+
+```
+h0mbre@pwn:~/fuzzing$ ./fuzzer Canon_altered.jpg 1000000
+[>] Size of file: 7958 bytes.
+[>] Flipping up to 159 bytes.
+[>] Fuzzing for 1000000 iterations...
+[>] Crashes: 86
+[>] Fuzzing completed, exiting...
+```
+
