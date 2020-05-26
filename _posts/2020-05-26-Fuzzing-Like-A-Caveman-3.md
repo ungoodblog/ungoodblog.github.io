@@ -495,7 +495,7 @@ So there are a lot of other things to consider, but hopefully this plainly demon
 ## Conclusion
 There are a lot of resources out there on different code coverage techniques, definitely follow up and read more on the subject if it interests you. [@carste1n](https://twitter.com/carste1n) has a great series where he goes through incrementally improves a fuzzer, you can catch the latest article here: https://carstein.github.io/2020/05/21/writing-simple-fuzzer-4.html
 
-At some time in the future we can add some code coverage logic to our dumb fuzzer from this article. 
+At some time in the future we can add some code coverage logic to our dumb fuzzer from this article and we can use the vulnerable program as a sort of benchmark to judge the effectiveness of a code coverage technique.  
 
 Some interesting notes, I fuzzed the vulnerable application with all three checks enabled with AFL for about 13 hours and wasn't able to crash it! I'm not sure why it was so difficult. With only two checks enabled, AFL was able to find the crash very quickly. Maybe there was something wrong with my testing, I'm not quite sure.
 
