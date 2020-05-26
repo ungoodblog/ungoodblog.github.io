@@ -1,6 +1,6 @@
 ---
 layout: single
-title: "Fuzzing Like A Caveman 3: Understanding Code Coverage, Maybe?"
+title: "Fuzzing Like A Caveman 3: Understanding Why Code Coverage Matters, Maybe?"
 date: 2020-05-26
 classes: wide
 header:
@@ -15,7 +15,7 @@ tags:
 ## Introduction
 In this episode of 'Fuzzing like a Caveman', we'll be continuing on our by noob for noobs fuzzing journey and trying to wrap our little baby fuzzing brains around the concept of code coverage and why its so important. As far as I know, code coverage is, at a high-level, the attempt made by fuzzers to track/increase how much of the target application's code is reached by the fuzzer's inputs. The idea being that the more code your fuzzer inputs reach, the greater the attack surface, the more comprehensive your testing is, and other big brain stuff that I don't understand yet. 
 
-I've been working on my pwn skills, but taking short breaks for sanity to write some C and watch some @gamazolabs streams. @gamazolabs broke down the importance of code coverage during one of these streams, and I cannot for the life of me track down the clip, but I remembered it vaguely enough to set up some test cases just for my own testing to demonstrate why "dumb" fuzzers are so disadvantaged compared to code-coverage-guided fuzzers. Get ready for some (probably incorrect 🤣) 8th grade probability theory. By the end of this blog post, we should be able to at least understand broadly how state of the art fuzzers worked in 1990. 
+I've been working on my pwn skills, but taking short breaks for sanity to write some C and watch some @gamazolabs streams. @gamazolabs broke down the importance of code coverage during one of these streams, and I cannot for the life of me track down the clip, but I remembered it vaguely enough to set up some test cases just for my own testing to demonstrate why "dumb" fuzzers are so disadvantaged compared to code-coverage-guided fuzzers. Get ready for some (probably incorrect 🤣) 8th grade probability theory. By the end of this blog post, we should be able to at least understand, broadly, how state of the art fuzzers worked in 1990. 
 
 ## Our Fuzzer
 We have this beautiful, error free, perfectly written, single-threaded jpeg mutation fuzzer that we've ported to C from our previous blog posts and tweaked a bit for the purposes of our experiments here. 
@@ -223,3 +223,166 @@ I wrote a simple cartoonish program to demonstrate how hard it can be for "dumb"
 
 ![](/assets/images/AWE/tree.PNG)
 
+Our program does this exact thing, it retrieves the bytes of an input file and checks the bytes at an index 1/3rd of the file length, 1/2 of the file length, and 2/3 of the file length to see if the bytes in those positions match some hardcoded values (arbitrary). If all the checks are passed, the application copies the byte buffer into a small buffer causing a segfault to simulate a vulnerable function. Here is our program:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+struct ORIGINAL_FILE {
+    char * data;
+    size_t length;
+};
+
+struct ORIGINAL_FILE get_bytes(char* fileName) {
+
+    FILE *filePtr;
+    char* buffer;
+    long fileLen;
+
+    filePtr = fopen(fileName, "rb");
+    if (!filePtr) {
+        printf("[>] Unable to open %s\n", fileName);
+        exit(-1);
+    }
+    
+    if (fseek(filePtr, 0, SEEK_END)) {
+        printf("[>] fseek() failed, wtf?\n");
+        exit(-1);
+    }
+
+    fileLen = ftell(filePtr);
+    if (fileLen == -1) {
+        printf("[>] ftell() failed, wtf?\n");
+        exit(-1);
+    }
+
+    errno = 0;
+    rewind(filePtr);
+    if (errno) {
+        printf("[>] rewind() failed, wtf?\n");
+        exit(-1);
+    }
+
+    long trueSize = fileLen * sizeof(char);
+    printf("[>] %s is %ld bytes.\n", fileName, trueSize);
+    buffer = (char *)malloc(fileLen * sizeof(char));
+    fread(buffer, fileLen, 1, filePtr);
+    fclose(filePtr);
+
+    struct ORIGINAL_FILE original_file;
+    original_file.data = buffer;
+    original_file.length = trueSize;
+
+    return original_file;
+}
+
+void check_one(char* buffer, int check) {
+
+    if (buffer[check] == '\x6c') {
+        return;
+    }
+    else {
+        printf("[>] Check 1 failed.\n");
+        exit(-1);
+    }
+}
+
+void check_two(char* buffer, int check) {
+
+    if (buffer[check] == '\x57') {
+        return;
+    }
+    else {
+        printf("[>] Check 2 failed.\n");
+        exit(-1);
+    }
+}
+
+void check_three(char* buffer, int check) {
+
+    if (buffer[check] == '\x21') {
+        return;
+    }
+    else {
+        printf("[>] Check 3 failed.\n");
+        exit(-1);
+    }
+}
+
+void vuln(char* buffer, size_t length) {
+
+    printf("[>] Passed all checks!\n");
+    char vulnBuff[20];
+
+    memcpy(vulnBuff, buffer, length);
+
+}
+
+int main(int argc, char *argv[]) {
+    
+    if (argc < 2 || argc > 2) {
+        printf("[>] Usage: vuln example.txt\n");
+        exit(-1);
+    }
+
+    char *filename = argv[1];
+    printf("[>] Analyzing file: %s.\n", filename);
+
+    struct ORIGINAL_FILE original_file = get_bytes(filename);
+
+    int checkNum1 = (int)(original_file.length * .33);
+    printf("[>] Check 1 no.: %d\n", checkNum1);
+
+    int checkNum2 = (int)(original_file.length * .5);
+    printf("[>] Check 2 no.: %d\n", checkNum2);
+
+    int checkNum3 = (int)(original_file.length * .67);
+    printf("[>] Check 3 no.: %d\n", checkNum3);
+
+    check_one(original_file.data, checkNum1);
+    check_two(original_file.data, checkNum2);
+    check_three(original_file.data, checkNum3);
+    
+    vuln(original_file.data, original_file.length);
+    
+
+    return 0;
+}
+```
+
+Our sample file, which we'll mutate and feed to this vulnerable application is still the same file from the previous posts, the `Canon_40D.jpg` file with exif data.
+```
+h0mbre@pwn:~/fuzzing$ file Canon_40D.jpg 
+Canon_40D.jpg: JPEG image data, JFIF standard 1.01, resolution (DPI), density 72x72, segment length 16, Exif Standard: [TIFF image data, little-endian, direntries=11, manufacturer=Canon, model=Canon EOS 40D, orientation=upper-left, xresolution=166, yresolution=174, resolutionunit=2, software=GIMP 2.4.5, datetime=2008:07:31 10:38:11, GPS-Data], baseline, precision 8, 100x68, frames 3
+h0mbre@pwn:~/fuzzing$ ls -lah Canon_40D.jpg 
+-rw-r--r-- 1 h0mbre h0mbre 7.8K May 25 06:21 Canon_40D.jpg
+```
+
+The file is 7958 bytes long. Let's feed it to the vulnerable program and see what indexes are chosen for the checks:
+```
+h0mbre@pwn:~/fuzzing$ vuln Canon_40D.jpg 
+[>] Analyzing file: Canon_40D.jpg.
+[>] Canon_40D.jpg is 7958 bytes.
+[>] Check 1 no.: 2626
+[>] Check 2 no.: 3979
+[>] Check 3 no.: 5331
+[>] Check 1 failed.
+```
+
+So we can see that indexes `2626`, `3979`, and `5331` were chosen for testing and that the file failed the first check as the byte at that position wasn't `\x6c`. 
+
+## Experiment 1: Passing Only One Check
+Let's take away checks two and three and see how our dumb fuzzer performs against the binary when we only have to pass one check. 
+
+I'll comment out checks two and three:
+```
+check_one(original_file.data, checkNum1);
+//check_two(original_file.data, checkNum2);
+//check_three(original_file.data, checkNum3);
+    
+vuln(original_file.data, original_file.length);
+```
+
+And so now, we'll take our unaltered jpeg, which naturally does not pass the first check, and have our fuzzer mutate it and send it to the vulnerable application hoping for crashes. Remember, that the fuzzer mutates up to 159 bytes of the 7958 bytes total each fuzzing iteration. If the fuzzer randomly inserts an `\x6c` into index `2626`, we will pass the first check and execution will pass to the vulnerable function and cause a crash. Let's run our dumb fuzzer 1 million times and see how many crashes we get. 
