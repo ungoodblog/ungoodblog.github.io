@@ -1,6 +1,6 @@
 ---
 layout: single
-title: "Fuzzing Like A Caveman 3: Understanding Why Code Coverage Matters, Maybe?"
+title: "Fuzzing Like A Caveman 3: Trying to Somewhat Understand The Importance Code Coverage"
 date: 2020-05-26
 classes: wide
 header:
@@ -385,4 +385,30 @@ check_one(original_file.data, checkNum1);
 vuln(original_file.data, original_file.length);
 ```
 
-And so now, we'll take our unaltered jpeg, which naturally does not pass the first check, and have our fuzzer mutate it and send it to the vulnerable application hoping for crashes. Remember, that the fuzzer mutates up to 159 bytes of the 7958 bytes total each fuzzing iteration. If the fuzzer randomly inserts an `\x6c` into index `2626`, we will pass the first check and execution will pass to the vulnerable function and cause a crash. Let's run our dumb fuzzer 1 million times and see how many crashes we get. 
+And so now, we'll take our unaltered jpeg, which naturally does not pass the first check, and have our fuzzer mutate it and send it to the vulnerable application hoping for crashes. Remember, that the fuzzer mutates up to 159 bytes of the 7958 bytes total each fuzzing iteration. If the fuzzer randomly inserts an `\x6c` into index `2626`, we will pass the first check and execution will pass to the vulnerable function and cause a crash. Let's run our dumb fuzzer 1 million times and see how many crashes we get.
+```
+h0mbre@pwn:~/fuzzing$ ./fuzzer Canon_40D.jpg 1000000
+[>] Size of file: 7958 bytes.
+[>] Flipping up to 159 bytes.
+[>] Fuzzing for 1000000 iterations...
+[>] Crashes: 88
+[>] Fuzzing completed, exiting...
+```
+
+So out of 1 million iterations, we got 88 crashes. So on about %.0088 of our iterations, we met the criteria to pass check 1 and hit the vulnerable function. Let's double check our crash to make sure there's no error in any of our code (I fuzzed the vulnerable program with all checks enabled in QEMU mode (to simulate not having source code) with AFL for 14 hours and wasn't able to crash the program so I hope there are no bugs I don't know about 😬).
+```
+h0mbre@pwn:~/fuzzing/ccrashes$ vuln 998636.11 
+[>] Analyzing file: 998636.11.
+[>] 998636.11 is 7958 bytes.
+[>] Check 1 no.: 2626
+[>] Check 2 no.: 3979
+[>] Check 3 no.: 5331
+[>] Passed all checks!
+Segmentation fault
+```
+
+So feeding the vulnerable program one of the crash inputs actually does crash it. Cool. 
+
+***Disclaimer***
+Here is where some math comes in, and I'm not guaranteeing this math is correct. I even sought help from some really smart people like [@Firzen14](https://twitter.com/Firzen14) and am still not 100% confident in the math lol. But! I did go ahead and simulate the systems involved here hundreds of millions of times and the results of the empirical data were super close to what the possibly broken math said it should be. So, if it's not correct, its at least close enough to prove the points I'm trying to demonstrate.
+***Disclaimer***
