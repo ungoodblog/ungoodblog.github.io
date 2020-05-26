@@ -379,7 +379,7 @@ So we can see that indexes `2626`, `3979`, and `5331` were chosen for testing an
 Let's take away checks two and three and see how our dumb fuzzer performs against the binary when we only have to pass one check. 
 
 I'll comment out checks two and three:
-```
+```c
 check_one(original_file.data, checkNum1);
 //check_two(original_file.data, checkNum2);
 //check_three(original_file.data, checkNum3);
