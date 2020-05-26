@@ -216,7 +216,9 @@ Let's say we're mutating an array of bytes called `bytes`. We're mutating index 
 + Flipping seventh bit: `01000011` = 67, and
 + Flipping eighth bit: `010000001` = 64.
 
-As you can see, we're locked in to a severely limited amount of possibilities. 
+As you can see, we're locked in to a severely limited amount of possibilities.
+
+So for this program, I've opted to replace this mutation method with one that instead just substitutes a random byte instead of a bit within the byte. 
 
 ## Vulnerable Program
 I wrote a simple cartoonish program to demonstrate how hard it can be for "dumb" fuzzers to find bugs. Imagine a target application that has several decision trees in the disassembly map view of the binary. The application performs 2-3 checks on the input to see if it meets certain criteria before passing the input to some sort of vulnerable function. Here is what I mean:
