@@ -352,6 +352,8 @@ int main(int argc, char *argv[]) {
 }
 ```
 
+Keep in mind that this is only one type of criteria, there are several different types of criteria that exist in binaries. I selected this one because the checks are so specific it can demonstrate, in an exaggerated way, how hard it can be to reach new code purely by randomness.
+
 Our sample file, which we'll mutate and feed to this vulnerable application is still the same file from the previous posts, the `Canon_40D.jpg` file with exif data.
 ```
 h0mbre@pwn:~/fuzzing$ file Canon_40D.jpg 
@@ -453,7 +455,9 @@ This is quite the problem. Our fuzzer would need to run for a very long time to 
 ## How Code Coverage Tracking Can Help Us
 If our fuzzer was able to track code coverage, we could turn this problem into something much more manageable. 
 
-Generically, a code coverage tracking system in our fuzzer would keep track of what inputs reached new code in the application. There are many ways to do this. Sometimes when source code is available to you, you can recompile the binaries with instrumentation added that informs the fuzzer when new code is reached, you can also use emulation, @gamazolabs has a really cool Windows userland code coverage system that leverages an extremely fast debugger that sets millions of breakpoints in a target binary and slowly removes breakpoints as they are reached called '[mesos](https://github.com/gamozolabs/mesos)'. Once your fuzzer becomes aware that a mutated input reached new code, it would save that input off so that it can be re-used and mutated further to reach even more code. That is a very simple explanation, but hopefully it paints a clear picture. 
+Generically, a code coverage tracking system in our fuzzer would keep track of what inputs reached new code in the application. There are many ways to do this. Sometimes when source code is available to you, you can recompile the binaries with instrumentation added that informs the fuzzer when new code is reached, there is emulation, etc. @gamazolabs has a really cool Windows userland code coverage system that leverages an extremely fast debugger that sets millions of breakpoints in a target binary and slowly removes breakpoints as they are reached called '[mesos](https://github.com/gamozolabs/mesos)'. Once your fuzzer becomes aware that a mutated input reached new code, it would save that input off so that it can be re-used and mutated further to reach even more code. That is a very simple explanation, but hopefully it paints a clear picture. 
+
+![](/assets/images/AWE/coverage.PNG)
 
 I haven't yet implemented a code coverage technique for the fuzzer, but we can easily simulate one. Let's say our fuzzer was able, 1 out of ~13,000 times, to pass the first check and reach that second check in the program. 
 
@@ -480,3 +484,13 @@ h0mbre@pwn:~/fuzzing$ ./fuzzer Canon_altered.jpg 1000000
 [>] Fuzzing completed, exiting...
 ```
 
+So by using the file that got us increased code coverage, ie it passed the first check, as a base file and sending it back through the mutator, we were able to pass the second check 86 times. We essentially took that exponentially hard problem we had earlier and turned it back into our original problem of only needing to pass one check. There are a bunch of other considerations that real fuzzers would have to take into account but I'm just trying to plainly demonstrate how it helps reduce the exponential problem into a more manageable one. 
+
+We reduced our `((0.0199798944458407 * 0.003921568627451‬) * (0.0198542347323448 * 0.003921568627451)) == 6.100507716342904e-9` problem to something closer to `(0.0199798944458407 * 0.003921568627451)‬`, which is a huge win for us. 
+
+Some nuance here is that feeding the altered file back through the mutation process could do a few things. It could remutate the byte at index `2626` and then we wouldn't even pass the first check. It could mutate the file so much (remember, it is already up to 2% different than a valid jpeg from the first round of mutation) that the vulnerable application flat out rejects the input and we waste fuzz cycles. 
+
+So there are a lot of other things to consider, but hopefully this plainly demonstrates how code-coverage helps fuzzers complete a more comprehensive test of a target binary. 
+
+## Conclusion
+There are a lot of resources out there on different code coverage techniques, definitely follow up and read more on the subject if it interests you. [@carste1n](https://twitter.com/carste1n) has a great series where he goes through incrementally improves a fuzzer, you can catch the latest article here: https://carstein.github.io/2020/05/21/writing-simple-fuzzer-4.html
