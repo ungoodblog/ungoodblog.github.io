@@ -108,7 +108,7 @@ analytics:
 author:
   name             : "h0mbre"
   avatar           : "/assets/images/avatar.jpg" # path of avatar image, e.g. "/assets/images/bio-photo.jpg"
-  bio              : "OSCP | OSCE | Idiot"
+  bio              : "Binary Exploitation"
   location         : "American East Coast"
   email            :
   links:
