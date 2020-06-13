@@ -7,8 +7,6 @@ header:
   teaser: /assets/images/avatar.jpg
 tags:
   - fuzzing
-  - exif
-  - parsing
   - C
 ---
 
