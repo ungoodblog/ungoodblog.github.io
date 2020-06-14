@@ -518,7 +518,8 @@ As you can see, it found both 'dynamic breakpoints' almost instantly and is curr
 
 Most importantly, you can see that we were able to crash the binary 5 times already in just 300k iterations! We could've never done this with our previous fuzzer.
 
-**CLICK THIS TO WATCH IT IN ACTION**
+**VV CLICK THIS TO WATCH IT IN ACTION VV**
+
 [![asciicast](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi.png)](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi)
 
 ## Conclusion
