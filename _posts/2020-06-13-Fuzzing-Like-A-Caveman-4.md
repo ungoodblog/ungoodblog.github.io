@@ -16,7 +16,7 @@ I'm addicted to fuzzing. That's it.
 Last time we blogged, we had a dumb fuzzer that would test an intentionally vulnerable program that would perform some checks on a file and if the input file passed a check, it would progress to the next check, and if the input passed all checks the program would segfault. We discovered the importance of **code coverage** and how it can help reduce exponentially rare occurences during fuzzing into linearly rare occurences. Let's get right into how we improved our dumb fuzzer!
 
 ## Performance
-First things first, our dumb fuzzer was slow as hell. If you remember, we were averaging about 1,500 fuzz cases per second with our dumb fuzzer. During my testing, AFL in QEMU mode (simulating not having source code available for compilation instrumentation) was hovering around 1,000 fuzz cases per second. This makes sense, since AFL does way more than our dumb fuzzer, especially in QEMU mode where we are emulating a CPU architecture and providing code coverage.
+First things first, our dumb fuzzer was slow as hell. If you remember, we were averaging about 1,500 fuzz cases per second with our dumb fuzzer. During my testing, AFL in QEMU mode (simulating not having source code available for compilation instrumentation) was hovering around 1,000 fuzz cases per second. This makes sense, since AFL does way more than our dumb fuzzer, especially in QEMU mode where we are emulating a CPU and providing code coverage.
 
 Our target binary (-> [HERE](https://gist.github.com/h0mbre/db209b70eb614aa811ce3b98ad38262d) <-) would do the following: 
 + extract the bytes from a file on disk into a buffer
@@ -120,4 +120,7 @@ After all of those syscalls, we **finally** open the file from the disk to read 
 openat(AT_FDCWD, "Canon_40D.jpg", O_RDONLY) = 3
 ```
 
-So keep in mind, we run these syscalls **every single** fuzz iteration with our dumb fuzzer.
+So keep in mind, we run these syscalls **every single** fuzz iteration with our dumb fuzzer. Our dumb fuzzer (-> [HERE](https://gist.github.com/h0mbre/0873edec8346122fc7dc5a1a03f0d2f1) <-) would open a write a file to disk every iteration, and the vulnerable binary would run all of the start up syscalls and finally read in the file from disk every iteration. So thats a couple dozen syscalls and **two** file system interactions every single fuzzing iteration. No wonder our dumb fuzzer was so slow. 
+
+## Implementing a Rudimentary Snapshot Mechanism
+
