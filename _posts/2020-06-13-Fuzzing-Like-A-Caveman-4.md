@@ -162,5 +162,5 @@ long long unsigned get_value(pid_t child_pid, long long unsigned address) {
 ```
 
 So this function will use the `PTRACE_PEEKTEXT` argument to read the value located at `address` in the child process (`child_pid`) which is our target. 
-
+ 
 
