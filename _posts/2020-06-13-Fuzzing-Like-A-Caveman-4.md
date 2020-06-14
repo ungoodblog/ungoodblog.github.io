@@ -161,6 +161,19 @@ long long unsigned get_value(pid_t child_pid, long long unsigned address) {
 }
 ```
 
-So this function will use the `PTRACE_PEEKTEXT` argument to read the value located at `address` in the child process (`child_pid`) which is our target. 
- 
+So this function will use the `PTRACE_PEEKTEXT` argument to read the value located at `address` in the child process (`child_pid`) which is our target. So now that we have this value, we can save it off and insert our breakpoint with the following code:
+
+```c
+void set_breakpoint(long long unsigned bp_address, long long unsigned original_value, pid_t child_pid) {
+
+    errno = 0;
+    long long unsigned breakpoint = (original_value & 0xFFFFFFFFFFFFFF00 | 0xCC);
+    int ptrace_result = ptrace(PTRACE_POKETEXT, child_pid, (void*)bp_address, (void*)breakpoint);
+    if (ptrace_result == -1 && errno != 0) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("ptrace");
+        exit(errno);
+    }
+}
+```
 
