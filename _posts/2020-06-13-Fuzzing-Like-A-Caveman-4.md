@@ -245,4 +245,29 @@ void revert_breakpoint(long long unsigned bp_address, long long unsigned origina
 Again, using `PTRACE_POKETEXT`, we can overwrite the `\xCC` with the original byte value. So now we have the ability to set and remove breakpoints. Let's now learn how we can utilize `ptrace` and the `/proc` pseudo files to create a snapshot of our target!
 
 ### Snapshotting with Ptrace and /Proc
-Another cool feature of `ptrace()` is the ability to capture register states in a debuggee process. 
+Another cool feature of `ptrace()` is the ability to capture and set register states in a debuggee process. We can do both of those things respectively with the helper functions I placed in `ptrace_helpers.c`:
+```c
+// retrieve register states
+struct user_regs_struct get_regs(pid_t child_pid, struct user_regs_struct registers) {                                                                                                 
+    int ptrace_result = ptrace(PTRACE_GETREGS, child_pid, 0, &registers);                                                                              
+    if (ptrace_result == -1) {                                                                              
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);                                                                         
+        perror("ptrace");                                                                              
+        exit(errno);                                                                              
+    }
+
+    return registers;                                                                              
+}
+```
+```c
+// set register states
+void set_regs(pid_t child_pid, struct user_regs_struct registers) {
+
+    int ptrace_result = ptrace(PTRACE_SETREGS, child_pid, 0, &registers);
+    if (ptrace_result == -1) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("ptrace");
+        exit(errno);
+    }
+}
+```
