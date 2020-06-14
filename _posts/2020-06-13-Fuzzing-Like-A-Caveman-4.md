@@ -120,7 +120,27 @@ After all of those syscalls, we **finally** open the file from the disk to read 
 openat(AT_FDCWD, "Canon_40D.jpg", O_RDONLY) = 3
 ```
 
-So keep in mind, we run these syscalls **every single** fuzz iteration with our dumb fuzzer. Our dumb fuzzer (-> [HERE](https://gist.github.com/h0mbre/0873edec8346122fc7dc5a1a03f0d2f1) <-) would open a write a file to disk every iteration, and the vulnerable binary would run all of the start up syscalls and finally read in the file from disk every iteration. So thats a couple dozen syscalls and **two** file system interactions every single fuzzing iteration. No wonder our dumb fuzzer was so slow. 
+So keep in mind, we run these syscalls **every single** fuzz iteration with our dumb fuzzer. Our dumb fuzzer (-> [HERE](https://gist.github.com/h0mbre/0873edec8346122fc7dc5a1a03f0d2f1) <-) would write a file to disk every iteration, and spawn an instance of the target program with `fork() + execvp()`. The vulnerable binary would run all of the start up syscalls and finally read in the file from disk every iteration. So thats a couple dozen syscalls and **two** file system interactions every single fuzzing iteration. No wonder our dumb fuzzer was so slow. 
 
-## Implementing a Rudimentary Snapshot Mechanism
+## Rudimentary Snapshot Mechanism
+I started to think about how we could save time when fuzzing such a simple target binary and thought if I could just figure out how to take a snapshot of the program's memory *after* it had already read the file off of disk and had stored the contents in its heap, I could just save that process state and manually insert a new fuzzcase in the place of the bytes that the target had read in and then have the program run until it reaches an `exit()` call. Once the target hits the exit call, I would rewind the program state to what it was when I captured the snapshot and insert a new fuzz case and then do it all over again.
 
+You can see how this would improve performance. We would skip all of the target binary startup overhead and we would completely bypass all file system interactions. A huge difference would be we would only make **one** call to `fork()` which is an expensive syscall. For 100,000 fuzzing iterations let's say, we'd go from 200,000 filesystem interactions (one for the dumb fuzzer to create a `mutated.jpeg` on disk, one for the target to read the `mutated.jpeg`) and 100,000 `fork()` calls to 0 file system interactions and only the initial `fork()`.
+
+In summary, our fuzzing process should look like this:
+1. Start target binary, but break on first instruction before anything runs
+2. Set breakpoints on a 'start' and 'end' location (start will be **after** the program reads in bytes from the file on disk, end will be the address of `exit()`)
+3. Run the program until it hits the 'start' breakpoint
+4. Collect all writable memory sections of the process in a buffer
+5. Capture all register states
+6. Insert our fuzzcase into the heap overwriting the bytes that the program read in from file on disk
+7. Resume target binary until it reaches 'end' breakpoint
+8. Rewind process state to where it was at 'start' 
+9. Repeat from step 6
+
+We are only doing steps 1-5 only once, so this routine doesn't need to be very fast. Steps 6-9 are where the fuzzer will spend 99% of its time so we need this to be fast.
+
+## Writing a Simple Debugger with Ptrace
+In order to implement our snapshot mechanism, we'll need to use the very intuitive, albeit apparently slow and restrictive, `ptrace()` interface. When I was getting started writing the debugger portion of the fuzzer a couple weeks ago, I leaned heavily on this [blog post](https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1) by [Eli Bendersky](https://twitter.com/elibendersky) which is a great introduction to `ptrace()` and shows you how to create a simple debugger. 
+
+The debugger portion of our code doesn't really need much functionality, it really only needs to be able to insert breakpoints and then 
