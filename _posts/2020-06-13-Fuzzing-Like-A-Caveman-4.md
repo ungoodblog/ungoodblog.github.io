@@ -18,7 +18,7 @@ Last time we blogged, we had a dumb fuzzer that would test an intentionally vuln
 ## Performance
 First things first, our dumb fuzzer was slow as hell. If you remember, we were averaging about 1,500 fuzz cases per second with our dumb fuzzer. During my testing, AFL in QEMU mode (simulating not having source code available for compilation instrumentation) was hovering around 1,000 fuzz cases per second. This makes sense, since AFL does way more than our dumb fuzzer, especially in QEMU mode where we are emulating a CPU architecture and providing code coverage.
 
-Our target binary would do the following: 
+Our target binary (-> [HERE](https://gist.github.com/h0mbre/db209b70eb614aa811ce3b98ad38262d) <-) would do the following: 
 + extract the bytes from a file on disk into a buffer
 + perform 3 checks on the buffer to see if the indexes that were checked matched hardcoded values
 + segfaulted if all checks were passed, exit if one of the checks failed
