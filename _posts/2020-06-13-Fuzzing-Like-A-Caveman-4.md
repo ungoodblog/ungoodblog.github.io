@@ -150,12 +150,12 @@ So first thing's first, we need a way to grab the one-byte value at an address b
 long long unsigned get_value(pid_t child_pid, long long unsigned address) {
 	
 	errno = 0;
-  long long unsigned value = ptrace(PTRACE_PEEKTEXT, child_pid, (void*)address, 0);
-  if (value == -1 && errno != 0) {
-      fprintf(stderr, "dragonfly> Error (%d) during ", errno);
-      perror("ptrace");
-      exit(errno);
-  }
+    long long unsigned value = ptrace(PTRACE_PEEKTEXT, child_pid, (void*)address, 0);
+    if (value == -1 && errno != 0) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("ptrace");
+        exit(errno);
+    }
 	
 	return value;	
 }
