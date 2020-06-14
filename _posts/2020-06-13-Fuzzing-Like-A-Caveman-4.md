@@ -518,7 +518,8 @@ As you can see, it found both 'dynamic breakpoints' almost instantly and is curr
 
 Most importantly, you can see that we were able to crash the binary 5 times already in just 300k iterations! We could've never done this with our previous fuzzer.
 
-[![asciicast](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi)](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi)
+**CLICK THIS TO WATCH IT IN ACTION**
+[![asciicast](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi.png)](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi)
 
 ## Conclusion
 One of the biggest takeaways for me from doing this was just how much more performance you can squeeze out of a fuzzer if you just customize it for your target. Using out of the box frameworks like AFL is great and they are incredibly impressive tools, I hope this fuzzer will one day grow into something comparable. We were able to run about 20-30x faster than AFL for this really simple target and were able to crash it almost instantly with just a little bit of reverse engineering and customization. I thought this was really neat and instructive. In the future, when I adapt this fuzzer for a real target, I should be able to outperform frameworks again. 
@@ -534,7 +535,7 @@ Where to begin? We have a lot of areas where we can improve but some immediate i
 Perhaps we will see these improvements in a subsequent post and the results of fuzzing a real target with the same general approach. Until then!
 
 ## Project Code
-
+All of the code for this blogpost can be found here:
 
 
 
