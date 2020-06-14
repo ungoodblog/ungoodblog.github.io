@@ -143,4 +143,24 @@ We are only doing steps 1-5 only once, so this routine doesn't need to be very f
 ## Writing a Simple Debugger with Ptrace
 In order to implement our snapshot mechanism, we'll need to use the very intuitive, albeit apparently slow and restrictive, `ptrace()` interface. When I was getting started writing the debugger portion of the fuzzer a couple weeks ago, I leaned heavily on this [blog post](https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1) by [Eli Bendersky](https://twitter.com/elibendersky) which is a great introduction to `ptrace()` and shows you how to create a simple debugger. 
 
-The debugger portion of our code doesn't really need much functionality, it really only needs to be able to insert breakpoints and then 
+The debugger portion of our code doesn't really need much functionality, it really only needs to be able to insert breakpoints and remove breakpoints. The way that you use `ptrace()` to set and remove breakpoints is to overwrite a single-byte instruction at at an address with the `int3` opcode `\xCC`. However, if you just overwrite the value there while setting a breakpoint, it will be impossible to remove the breakpoint because you won't know what value was held there originally and so you won't know what to overwrite `\xCC` with. 
+
+So first thing's first, we need a way to grab the one-byte value at an address before we insert our breakpoint. For the fuzzer, I developed a header file and source file I called `ptrace_helpers` to help ease the development process of using `ptrace()`. To grab the value, we'll grab the 64-bit value at the address but only care about the byte all the way to the right. (I'm using the type `long long unsigned` because that's how register values are defined in `<sys/user.h>` and I wanted to keep everything the same). 
+```c
+long long unsigned get_value(pid_t child_pid, long long unsigned address) {
+	
+	errno = 0;
+  long long unsigned value = ptrace(PTRACE_PEEKTEXT, child_pid, (void*)address, 0);
+  if (value == -1 && errno != 0) {
+      fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+      perror("ptrace");
+      exit(errno);
+  }
+	
+	return value;	
+}
+```
+
+So this function will use the `PTRACE_PEEKTEXT` argument to read the value located at `address` in the child process (`child_pid`) which is our target. 
+
+
