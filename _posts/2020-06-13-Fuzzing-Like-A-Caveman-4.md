@@ -242,9 +242,27 @@ void revert_breakpoint(long long unsigned bp_address, long long unsigned origina
 }
 ```
 
-Again, using `PTRACE_POKETEXT`, we can overwrite the `\xCC` with the original byte value. So now we have the ability to set and remove breakpoints. Let's now learn how we can utilize `ptrace` and the `/proc` pseudo files to create a snapshot of our target!
+Again, using `PTRACE_POKETEXT`, we can overwrite the `\xCC` with the original byte value. So now we have the ability to set and remove breakpoints. 
 
-### Snapshotting with Ptrace and /Proc
+Lastly, we'll need a way to resume execution in the debuggee. This can be accomplished by utilizing the `PTRACE_CONT` argument in `ptrace()` as follows:
+```c
+void resume_execution(pid_t child_pid) {
+
+    int ptrace_result = ptrace(PTRACE_CONT, child_pid, 0, 0);
+    if (ptrace_result == -1) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("ptrace");
+        exit(errno);
+    }
+}
+```
+An important thing to note is, if we hit a breakpoint at address `0x000000000000000`, `rip` will actually be at `0x0000000000000001`. So after reverting our overwritten instruction to its previous value, we'll also need to subtract 1 from `rip` before resuming execution, we'll learn how to do this via `ptrace` in the next section.
+
+Let's now learn how we can utilize `ptrace` and the `/proc` pseudo files to create a snapshot of our target!
+
+### Snapshotting with ptrace and /proc
+
+### Register States
 Another cool feature of `ptrace()` is the ability to capture and set register states in a debuggee process. We can do both of those things respectively with the helper functions I placed in `ptrace_helpers.c`:
 ```c
 // retrieve register states
@@ -271,3 +289,8 @@ void set_regs(pid_t child_pid, struct user_regs_struct registers) {
     }
 }
 ```
+
+The `struct user_regs_struct` is defined in `<sys/user.h>`. You can see we use `PTRACE_GETREGS` and `PTRACE_SETREGS` respectively to retrieve register data and set register data. So with these two functions, we'll be able to create a `struct user_regs_struct` of snapshot register values when we are sitting at our 'start' breakpoint and when we reach our 'end' breakpoint, we'll be able to revert the register states (most imporantly `rip`) to what they were when snapshotted. 
+
+### Snapshotting Writable Memory Sections with /proc
+
