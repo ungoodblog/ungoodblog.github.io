@@ -177,3 +177,19 @@ void set_breakpoint(long long unsigned bp_address, long long unsigned original_v
 }
 ```
 
+You can see that this function will take our original value that we gathered with the previous function and performs two bitwise operations to keep the first 7 bytes intact but then replace the last byte with `\xCC`. Notice that we are now using `PTRACE_POKETEXT`. One of the frustrating features of the `ptrace()` interface is that we can only read and write 8 bytes at a time!
+
+So now that we can set breakpoints, the last function we need to implement is one to remove breakpoints, which would entail overwriting the `int3` with the original byte value. 
+```c
+void revert_breakpoint(long long unsigned bp_address, long long unsigned original_value, pid_t child_pid) {
+
+    errno = 0;
+    int ptrace_result = ptrace(PTRACE_POKETEXT, child_pid, (void*)bp_address, (void*)original_value);
+    if (ptrace_result == -1 && errno != 0) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("ptrace");
+        exit(errno);
+    }
+}
+```
+
