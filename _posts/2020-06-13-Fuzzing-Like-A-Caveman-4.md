@@ -155,6 +155,44 @@ if (child_pid == 0) {
 }
 ```
 
+Now we need to have the child process volunteer to be 'traced' by the parent process. This is done with the `PTRACE_TRACEME` argument, which we'll use inside our `execute_debugee` function:
+```c
+// request via PTRACE_TRACEME that the parent trace the child
+long ptrace_result = ptrace(PTRACE_TRACEME, 0, 0, 0);
+if (ptrace_result == -1) {
+    fprintf(stderr, "\033[1;35mdragonfly>\033[0m error (%d) during ", errno);
+    perror("ptrace");
+    exit(errno);
+}
+```
+
+The rest of the function doesn't involve `ptrace` but I'll go ahead and show it here because there is an important function to forcibly disable ASLR in the debuggee process. This is crucial as we'll be leverage breakpoints at static addresses that **cannot** change process to process. We disable ASLR by calling `personality()` with `ADDR_NO_RANDOMIZE`. Separately, we'll route `stdout` and `stderr` to `/dev/null` so that we don't muddy our terminal with the target binary's output.
+```c
+// disable ASLR
+int personality_result = personality(ADDR_NO_RANDOMIZE);
+if (personality_result == -1) {
+    fprintf(stderr, "\033[1;35mdragonfly>\033[0m error (%d) during ", errno);
+    perror("personality");
+    exit(errno);
+}
+ 
+// dup both stdout and stderr and send them to /dev/null
+int fd = open("/dev/null", O_WRONLY);
+dup2(fd, 1);
+dup2(fd, 2);
+close(fd);
+ 
+// exec our debugee program, NULL terminated to avoid Sentinel compilation
+// warning. this replaces the fork() clone of the parent with the 
+// debugee process 
+int execl_result = execl(debugee, debugee, NULL);
+if (execl_result == -1) {
+    fprintf(stderr, "\033[1;35mdragonfly>\033[0m error (%d) during ", errno);
+    perror("execl");
+    exit(errno);
+}
+```
+
 So first thing's first, we need a way to grab the one-byte value at an address before we insert our breakpoint. For the fuzzer, I developed a header file and source file I called `ptrace_helpers` to help ease the development process of using `ptrace()`. To grab the value, we'll grab the 64-bit value at the address but only care about the byte all the way to the right. (I'm using the type `long long unsigned` because that's how register values are defined in `<sys/user.h>` and I wanted to keep everything the same).
 
 ```c
