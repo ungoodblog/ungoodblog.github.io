@@ -148,16 +148,16 @@ The debugger portion of our code doesn't really need much functionality, it real
 So first thing's first, we need a way to grab the one-byte value at an address before we insert our breakpoint. For the fuzzer, I developed a header file and source file I called `ptrace_helpers` to help ease the development process of using `ptrace()`. To grab the value, we'll grab the 64-bit value at the address but only care about the byte all the way to the right. (I'm using the type `long long unsigned` because that's how register values are defined in `<sys/user.h>` and I wanted to keep everything the same). 
 ```c
 long long unsigned get_value(pid_t child_pid, long long unsigned address) {
-	
-	errno = 0;
+    
+    errno = 0;
     long long unsigned value = ptrace(PTRACE_PEEKTEXT, child_pid, (void*)address, 0);
     if (value == -1 && errno != 0) {
         fprintf(stderr, "dragonfly> Error (%d) during ", errno);
         perror("ptrace");
         exit(errno);
     }
-	
-	return value;	
+
+    return value;	
 }
 ```
 
