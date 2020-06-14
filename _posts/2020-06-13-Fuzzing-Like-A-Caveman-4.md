@@ -195,4 +195,6 @@ void revert_breakpoint(long long unsigned bp_address, long long unsigned origina
 }
 ```
 
-Again, using 
+Again, using `PTRACE_POKETEXT`, we can overwrite the `\xCC` with the original byte value. So now we have the ability to set and remove breakpoints. Let's now learn how we can utilize `ptrace` and the `/proc` pseudo files to create a snapshot of our target!
+
+### Snapshotting with Ptrace and /Proc
