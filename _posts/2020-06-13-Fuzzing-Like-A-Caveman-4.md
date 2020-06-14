@@ -149,10 +149,10 @@ The debugger portion of our code doesn't really need much functionality, it real
 To begin using `ptrace()`, we spawn a second process with `fork()`.
 ```c
 pid_t child_pid = fork();
-    if (child_pid == 0) {
-        //we're the child process here
-        execute_debugee(debugee);
-    }
+if (child_pid == 0) {
+    //we're the child process here
+    execute_debugee(debugee);
+}
 ```
 
 So first thing's first, we need a way to grab the one-byte value at an address before we insert our breakpoint. For the fuzzer, I developed a header file and source file I called `ptrace_helpers` to help ease the development process of using `ptrace()`. To grab the value, we'll grab the 64-bit value at the address but only care about the byte all the way to the right. (I'm using the type `long long unsigned` because that's how register values are defined in `<sys/user.h>` and I wanted to keep everything the same).
