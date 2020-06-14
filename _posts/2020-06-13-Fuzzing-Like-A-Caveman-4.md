@@ -313,4 +313,228 @@ $rax   : 0x00005555557588b0  →  0x464a1000e0ffd8ff
 
 That pointer, `0x00005555557588b0`, is located in the heap. So all I had to do to find out where that pointer was in our debugger/fuzzer, was just break at the same point and use `ptrace()` to retrieve the `rax` value.
 
+I would break on `check_one` and then open `/proc/$pid/maps` to get the offsets within the program that contain writable memory sections, and then I would open `/proc/$pid/mem` and read from those offsets into a buffer to store the writable memory. This code was stored in a source file called `snapshot.c` which contained some definitions and functions to both capture snapshots and restore them. For this part, capturing writable memory, I used the following definitions and function:
+```c
+unsigned char* create_snapshot(pid_t child_pid) {
+ 
+    struct SNAPSHOT_MEMORY read_memory = {
+        {
+            // maps_offset
+            0x555555756000,
+            0x7ffff7dcf000,
+            0x7ffff7dd1000,
+            0x7ffff7fe0000,
+            0x7ffff7ffd000,
+            0x7ffff7ffe000,
+            0x7ffffffde000
+        },
+        {
+            // snapshot_buf_offset
+            0x0,
+            0xFFF,
+            0x2FFF,
+            0x6FFF,
+            0x8FFF,
+            0x9FFF,
+            0xAFFF
+        },
+        {
+            // rdwr length
+            0x1000,
+            0x2000,
+            0x4000,
+            0x2000,
+            0x1000,
+            0x1000,
+            0x21000
+        }
+    };  
+ 
+    unsigned char* snapshot_buf = (unsigned char*)malloc(0x2C000);
+ 
+    // this is just /proc/$pid/mem
+    char proc_mem[0x20] = { 0 };
+    sprintf(proc_mem, "/proc/%d/mem", child_pid);
+ 
+    // open /proc/$pid/mem for reading
+    // hardcoded offsets are from typical /proc/$pid/maps at main()
+    int mem_fd = open(proc_mem, O_RDONLY);
+    if (mem_fd == -1) {
+        fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+        perror("open");
+        exit(errno);
+    }
+ 
+    // this loop will:
+    //  -- go to an offset within /proc/$pid/mem via lseek()
+    //  -- read x-pages of memory from that offset into the snapshot buffer
+    //  -- adjust the snapshot buffer offset so nothing is overwritten in it
+    int lseek_result, bytes_read;
+    for (int i = 0; i < 7; i++) {
+        //printf("dragonfly> Reading from offset: %d\n", i+1);
+        lseek_result = lseek(mem_fd, read_memory.maps_offset[i], SEEK_SET);
+        if (lseek_result == -1) {
+            fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+            perror("lseek");
+            exit(errno);
+        }
+ 
+        bytes_read = read(mem_fd,
+            (unsigned char*)(snapshot_buf + read_memory.snapshot_buf_offset[i]),
+            read_memory.rdwr_length[i]);
+        if (bytes_read == -1) {
+            fprintf(stderr, "dragonfly> Error (%d) during ", errno);
+            perror("read");
+            exit(errno);
+        }
+    }
+ 
+    close(mem_fd);
+    return snapshot_buf;
+}
+```
+
+You can see that I hardcoded all the offsets and the lengths of the sections. Keep in mind, this doesn't need to be fast. We're only capturing a snapshot once, so it's ok to interact with the file system. So we'll loop through these 7 offsets and lengths and write them all into a buffer called `snapshot_buf` which will be stored in our fuzzer's heap. So now we have both the register states and the memory states of our process as it begins `check_one` (our 'start' breakpoint). 
+
+Let's now figure out how to restore the snapshot when we reach our 'end' breakpoint.
+
+### Restoring Snapshot
+To restore the process memory state, we could just write to `/proc/$pid/mem` the same way we read from it; however, this portion needs to be fast since we are doing this every fuzzing iteration now. Iteracting with the file system every fuzzing iteration will slow us down big time. Luckily, since Linux kernel version 3.2, there is support for a much faster, process-to-process, memory reading/writing API that we can leverage called [`process_vm_writev()`](https://linux.die.net/man/2/process_vm_writev). Since this process works directly with another process and doesn't traverse the kernel and doesn't involve the file system, it will greatly increase our write speeds.
+
+It's kind of confusing looking at first but the man page example is really all you need to understand how it works, I've opted to just hardcode all of the offsets since this fuzzer is simply a POC. and we can restore the writable memory as follows:
+```c
+void restore_snapshot(unsigned char* snapshot_buf, pid_t child_pid) {
+ 
+    ssize_t bytes_written = 0;
+    // we're writing *from* 7 different offsets within snapshot_buf
+    struct iovec local[7];
+    // we're writing *to* 7 separate sections of writable memory here
+    struct iovec remote[7];
+ 
+    // this struct is the local buffer we want to write from into the 
+    // struct that is 'remote' (ie, the child process where we'll overwrite
+    // all of the non-heap writable memory sections that we parsed from 
+    // proc/$pid/memory)
+    local[0].iov_base = snapshot_buf;
+    local[0].iov_len = 0x1000;
+    local[1].iov_base = (unsigned char*)(snapshot_buf + 0xFFF);
+    local[1].iov_len = 0x2000;
+    local[2].iov_base = (unsigned char*)(snapshot_buf + 0x2FFF);
+    local[2].iov_len = 0x4000;
+    local[3].iov_base = (unsigned char*)(snapshot_buf + 0x6FFF);
+    local[3].iov_len = 0x2000;
+    local[4].iov_base = (unsigned char*)(snapshot_buf + 0x8FFF);
+    local[4].iov_len = 0x1000;
+    local[5].iov_base = (unsigned char*)(snapshot_buf + 0x9FFF);
+    local[5].iov_len = 0x1000;
+    local[6].iov_base = (unsigned char*)(snapshot_buf + 0xAFFF);
+    local[6].iov_len = 0x21000;
+ 
+    // just hardcoding the base addresses that are writable memory
+    // that we gleaned from /proc/pid/maps and their lengths
+    remote[0].iov_base = (void*)0x555555756000;
+    remote[0].iov_len = 0x1000;
+    remote[1].iov_base = (void*)0x7ffff7dcf000;
+    remote[1].iov_len = 0x2000;
+    remote[2].iov_base = (void*)0x7ffff7dd1000;
+    remote[2].iov_len = 0x4000;
+    remote[3].iov_base = (void*)0x7ffff7fe0000;
+    remote[3].iov_len = 0x2000;
+    remote[4].iov_base = (void*)0x7ffff7ffd000;
+    remote[4].iov_len = 0x1000;
+    remote[5].iov_base = (void*)0x7ffff7ffe000;
+    remote[5].iov_len = 0x1000;
+    remote[6].iov_base = (void*)0x7ffffffde000;
+    remote[6].iov_len = 0x21000;
+ 
+    bytes_written = process_vm_writev(child_pid, local, 7, remote, 7, 0);
+    //printf("dragonfly> %ld bytes written\n", bytes_written);
+}
+```
+
+So for 7 different writable sections, we'll write into the debuggee process at the offsets defined in `/proc/$pid/maps` from our `snapshot_buf` that has the pristine snapshot data. AND IT WILL BE FAST!
+
+So now that we have the ability to restore the writable memory, we'll only need to restore the register states now and we'll be able to complete our rudimentary snapshot mechanism. That is easy using our `ptrace_helpers` defined functions and you can see the two function calls within the fuzzing loop as follows: 
+```c
+// restore writable memory from /proc/$pid/maps to its state at Start
+restore_snapshot(snapshot_buf, child_pid);
+
+// restore registers to their state at Start
+set_regs(child_pid, snapshot_registers);
+```
+
+So that's how our snapshot process works and in my testing, we achieved about a 20-30x speed-up over the dumb fuzzer!
+
+## Making our Dumb Fuzzer Smart
+At this point, we still have a dumb fuzzer (albeit much faster now). We need to be able to track code coverage. A very simple way to do this would be to place a breakpoint at every 'basic block' between `check_one` and `exit` so that if we reach new code, a breakpoint will be reached and we can `do_something()` there. 
+
+This is exactly what I did except for simplicity sake, I just placed 'dynamic' (code coverage) breakpoints at the entry points to `check_two` and `check_three`. When a 'dynamic' breakpoint is reached, we save the input that reached the code into an array of `char` pointers called the 'corpus' and we can now start mutating those saved inputs instead of just our 'prototype' input of `Canon_40D.jpg`. 
+
+So our code coverage feedback mechanism will work like this:
+1. Mutate prototype input and insert the fuzzcase into the heap
+2. Resume debuggee
+3. If 'dynamic breakpoint' reached, save input into corpus
+4. If corpus > 0, randomly pick an input from the corpus or the prototype and repeat from step 1
+
+We also have to remove the dynamic breakpoint so that we stop breaking on it. Good thing we already know how to do this well!
+
+As you may remember from the last post, code coverage is crucial to our ability to crash this test binary `vuln` as it performs 3 byte comparisons that all must pass before it crashes. We determined mathematically last post that our chances of passing the first check is about **1 in 13 thousand** and our chances of passing the first two checks is about **1 in 170 million**. Because we're saving input off that passes `check_one` and mutating it further, we can reduce the probability of passing `check_two` down to something close to the **1 in 13 thousand** figure. This also applies to inputs that then pass `check_two` and we can therefore reach and pass `check_three` with ease. 
+
+## Running The Fuzzer
+The first stage of our fuzzer, which collects snapshot data and sets 'dynamic breakpoints' for code coverage, completes very quickly even though its not meant to be fast. This is because all the values are hardcoded since our target is extremely simple. In a complex multi-threaded target we would need some way to script the discovery of dynamic breakpoint addresses via Ghidra or `objdump` or something and we'd need to have that script write a configuration file for our fuzzer, but that's far off. For now, for a POC, this works fine. 
+
+```
+h0mbre@pwn:~/fuzzing/dragonfly_dir$ ./dragonfly 
+
+dragonfly> debuggee pid: 12156
+dragonfly> setting 'start/end' breakpoints:
+
+   start-> 0x555555554b41
+   end  -> 0x5555555548c0
+
+dragonfly> set dynamic breakpoints: 
+
+           0x555555554b7d
+           0x555555554bb9
+
+dragonfly> collecting snapshot data
+dragonfly> snapshot collection complete
+dragonfly> press any key to start fuzzing!
+```
+
+You can see that the fuzzer helpfully displays the 'start' and 'end' breakpoints as well as lists the 'dynamic breakpoints' for us so that we can check to see that they are correct before fuzzing. The fuzzer pauses and waits for us to press any key to start fuzzing. We can also see that the snapshot data collection has completed successfully so now we are broken on 'start' and have all the data we need to start fuzzing.
+
+Once we press enter, we get a statistics output that shows us how the fuzzing is going:
+```
+dragonfly> stats (target:vuln, pid:12156)
+
+fc/s       : 41720
+crashes    : 5
+iterations : 0.3m
+coverage   : 2/2 (%100.00)
+```
+
+As you can see, it found both 'dynamic breakpoints' almost instantly and is currently running about 41k fuzzing iterations per second of CPU time (about 20-30x faster in wall time than our dumb fuzzer).
+
+Most importantly, you can see that we were able to crash the binary 5 times already in just 300k iterations! We could've never done this with our previous fuzzer.
+
+[![asciicast](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi.png)](https://asciinema.org/a/WJEXrsznf1GY3FLxAAf7TsNBi)
+
+## Conclusion
+One of the biggest takeaways for me from doing this was just how much more performance you can squeeze out of a fuzzer if you just customize it for your target. Using out of the box frameworks like AFL is great and they are incredibly impressive tools, I hope this fuzzer will one day grow into something comparable. We were able to run about 20-30x faster than AFL for this really simple target and were able to crash it almost instantly with just a little bit of reverse engineering and customization. I thought this was really neat and instructive. In the future, when I adapt this fuzzer for a real target, I should be able to outperform frameworks again. 
+
+## Ideas for Improvment
+Where to begin? We have a lot of areas where we can improve but some immediate improvements that can be made are:
++ optimize performance by refactoring code, changing location of global variables
++ enabling the dynamic configuration of the fuzzer via a config file that can be created via a Python script
++ implementing more mutation methods
++ implementing more code coverage mechanisms
++ developing the fuzzer so that many instances can run in parallel and share discovered inputs/coverage data
+
+Perhaps we will see these improvements in a subsequent post and the results of fuzzing a real target with the same general approach. Until then!
+
+## Project Code
+
+
+
 
