@@ -11,8 +11,6 @@ tags:
 ---
 
 ## Introduction
-I'm addicted to fuzzing. That's it. 
-
 Last time we blogged, we had a dumb fuzzer that would test an intentionally vulnerable program that would perform some checks on a file and if the input file passed a check, it would progress to the next check, and if the input passed all checks the program would segfault. We discovered the importance of **code coverage** and how it can help reduce exponentially rare occurences during fuzzing into linearly rare occurences. Let's get right into how we improved our dumb fuzzer!
 
 ## Performance
