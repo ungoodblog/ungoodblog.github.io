@@ -146,6 +146,15 @@ In order to implement our snapshot mechanism, we'll need to use the very intuiti
 ### Breakpoints 
 The debugger portion of our code doesn't really need much functionality, it really only needs to be able to insert breakpoints and remove breakpoints. The way that you use `ptrace()` to set and remove breakpoints is to overwrite a single-byte instruction at at an address with the `int3` opcode `\xCC`. However, if you just overwrite the value there while setting a breakpoint, it will be impossible to remove the breakpoint because you won't know what value was held there originally and so you won't know what to overwrite `\xCC` with. 
 
+To begin using `ptrace()`, we spawn a second process with `fork()`.
+```c
+pid_t child_pid = fork();
+    if (child_pid == 0) {
+        //we're the child process here
+        execute_debugee(debugee);
+    }
+```
+
 So first thing's first, we need a way to grab the one-byte value at an address before we insert our breakpoint. For the fuzzer, I developed a header file and source file I called `ptrace_helpers` to help ease the development process of using `ptrace()`. To grab the value, we'll grab the 64-bit value at the address but only care about the byte all the way to the right. (I'm using the type `long long unsigned` because that's how register values are defined in `<sys/user.h>` and I wanted to keep everything the same).
 
 ```c
@@ -198,3 +207,4 @@ void revert_breakpoint(long long unsigned bp_address, long long unsigned origina
 Again, using `PTRACE_POKETEXT`, we can overwrite the `\xCC` with the original byte value. So now we have the ability to set and remove breakpoints. Let's now learn how we can utilize `ptrace` and the `/proc` pseudo files to create a snapshot of our target!
 
 ### Snapshotting with Ptrace and /Proc
+Another cool feature of `ptrace()` is the ability to capture register states in a debuggee process. 
