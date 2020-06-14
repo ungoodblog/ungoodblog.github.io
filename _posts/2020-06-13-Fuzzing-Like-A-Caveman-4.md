@@ -293,4 +293,24 @@ void set_regs(pid_t child_pid, struct user_regs_struct registers) {
 The `struct user_regs_struct` is defined in `<sys/user.h>`. You can see we use `PTRACE_GETREGS` and `PTRACE_SETREGS` respectively to retrieve register data and set register data. So with these two functions, we'll be able to create a `struct user_regs_struct` of snapshot register values when we are sitting at our 'start' breakpoint and when we reach our 'end' breakpoint, we'll be able to revert the register states (most imporantly `rip`) to what they were when snapshotted. 
 
 ### Snapshotting Writable Memory Sections with /proc
+Now that we have a way to capture register states, we'll need a way to capture writable memory states for our snapshot. I did this by interacting with the `/proc` pseudo files. I used GDB to break on the first function that peforms a check in `vuln`, importantly this function is after `vuln` reads the `jpeg` off disk and will serve as our 'start' breakpoint. Once we break here in GDB, we can `cat` the `/proc/$pid/maps` file to get a look at how memory is mapped in the process (keep in mind GDB also forces ASLR off using the same method we did in our debugger). We can see the output here grepping for writable sections (ie, sections that could be clobbered during our fuzzcase run):
+```
+h0mbre@pwn:~/fuzzing/dragonfly_dir$ cat /proc/12011/maps | grep rw
+555555756000-555555757000 rw-p 00002000 08:01 786686                     /home/h0mbre/fuzzing/dragonfly_dir/vuln
+555555757000-555555778000 rw-p 00000000 00:00 0                          [heap]
+7ffff7dcf000-7ffff7dd1000 rw-p 001eb000 08:01 1055012                    /lib/x86_64-linux-gnu/libc-2.27.so
+7ffff7dd1000-7ffff7dd5000 rw-p 00000000 00:00 0 
+7ffff7fe0000-7ffff7fe2000 rw-p 00000000 00:00 0 
+7ffff7ffd000-7ffff7ffe000 rw-p 00028000 08:01 1054984                    /lib/x86_64-linux-gnu/ld-2.27.so
+7ffff7ffe000-7ffff7fff000 rw-p 00000000 00:00 0 
+7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
+```
+
+So that's seven distinct sections of memory. You'll notice that the `heap` is one of the sections. It is important to realize that our fuzzcase will be inserted into the heap, but the address in the heap that stores the fuzzcase will not be the same in our fuzzer as it is in GDB. This is likely due to some sort of environment variable difference between the two debuggers I think. If we look in GDB when we break on `check_one()` in `vuln`, we see that `rax` is a pointer to the beginning of our input, in this case the `Canon_40D.jpg`. 
+```
+$rax   : 0x00005555557588b0  →  0x464a1000e0ffd8ff
+```
+
+That pointer, `0x00005555557588b0`, is located in the heap. So all I had to do to find out where that pointer was in our debugger/fuzzer, was just break at the same point and use `ptrace()` to retrieve the `rax` value.
+
 
