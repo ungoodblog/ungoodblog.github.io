@@ -146,7 +146,7 @@ struct PROC_DATA {
 So as I'm using our Read What Where primitive to blow through all the RAM hunting for `"Proc"`, if I find an instance of `"Proc"` I'll iterate `0x10` bytes at a time until I find a marker signifying the end of our pool headers and the beginning of `EPROCESS`. This marker was `0x00B80003`. So now, I'll have the `proc_address` the literal place where `"Proc"` was and store that in `PROC_DATA.proc_address`, I'll also annotate how far that address was from the nearest page-aligned memory address (a multiple of `0x1000`) in `PROC_DATA.proc_address` and also annotate how far from `"Proc"` it was until we reached our marker or the beginning of `EPROCESS` in `PROC.header_size`. These will all be stored in a vector.
 
 You can see this routine here:
-```
+```cpp
 INT64 results_begin = ((INT64)output_buff + 0xc);
         for (INT64 i = 0; i < 0xF60; i = i + 0x10) {
 
@@ -197,7 +197,7 @@ It will be more obvious with the entire exploit code, but what I'm doing here is
 Now that I knew exactly how many `"Proc"` chunks I had found and stored all their relevant metadata in a vector, I could start a second routine that would use that metadata to check for their `EPROCESS` member values to see if they were processes I cared about.
 
 My strategy here was to find the `EPROCESS` members for a privileged process such as `lsass.exe` and swap its security token with the security token of a `cmd.exe` process that I owned. You can see a portion of that code here:
-```
+```cpp
 INT64 results_begin = ((INT64)output_buff + 0xc);
 
         INT64 imagename_address = results_begin +
@@ -263,7 +263,7 @@ So instead of an 8 byte write to simply overwrite the value, I'd be opting to co
 
 You can see some of that math in the code snippet below with references to `modulus`. Remember that the Write What Where utilized the input buffer of `DeviceIoControl` as the buffer it would copy over into the kernel memory:
 
-```
+```cpp
 if (!DeviceIoControl(
         hFile,
         READ_IOCTL,
