@@ -326,7 +326,8 @@ if (!DeviceIoControl(
 
 ## Final Results
 You can see the mandatory full exploit screenshot below:
-![](/assets/images/AWE/master_exploit.PNG)
+
+![](/assets/images/AWE/master_exploit.png)
 
 ## Disclosure Timeline
 Big thanks to Tod Beardsley at Rapid7 for his help with the disclosure process!
