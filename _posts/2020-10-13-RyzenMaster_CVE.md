@@ -87,7 +87,7 @@ This is progress, I was fairly certain at this point I had a write primitive; ho
 ### Read What Where
 Now I went back to the other cross references of `MmMapIoSpace` calls and eventually came upon this routine, `sub_1400063D0`. 
 
-![](/assets/images/AWE/63d0_write_function.PNG)
+![](/assets/images/AWE/63d0_read_function.PNG)
 
 You'd be forgiven if you think it looks just like the last routine we analyzed, I know I did and missed it initially; however, this routine differs in one major way. Instead of copying byte by byte out of our process space buffer and into a kernel buffer, we are copying byte by byte out of a kernel buffer and into our process space buffer. I will spare you the technical analysis here but it is essentially our other routine except only the source and destinations are reversed! This is our read what where primitive and I was able to back track a cross reference in IDA to this IOCTL. 
 
