@@ -249,11 +249,11 @@ The problem I was facing was that I need my calls to `MmMapIoSpace` to be page-a
 
 So let's picture a page of memory as a line.
 
-<------------MEMORY PAGE------------>
+<-----------------MEMORY PAGE----------------->
 
 We can only write in page-size chunks; however, the value we want to overwrite, the value of the `cmd.exe` process's `Token`, is most-likely not page-aligned. So now we have this:
 
-<----offset to TOKEN----------------->
+<---------TOKEN------------------------------->
 
 I could do a direct write at the exact address of this `Token` value, but my call to `MmMapIoSpace` would not be page-aligned. 
 
