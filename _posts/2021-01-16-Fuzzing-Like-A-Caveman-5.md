@@ -1,4 +1,3 @@
-```
 ---
 layout: single
 title: "Fuzzing Like A Caveman 5: A Code Coverage Tour for Cavepeople"
@@ -10,9 +9,6 @@ tags:
   - fuzzing
   - code coverage
 ---
-```
-
-
 
 ## Introduction
 
