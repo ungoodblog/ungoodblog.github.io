@@ -173,7 +173,7 @@ All in all, this is a really effective coverage method especially given the vari
 
 Tracking edges is very popular because this is the strategy employed by AFL and its children. This is the approach where we not only care about what basic blocks are being hit but also, what relationships are being explored between basic blocks.
 
-![](/assets/images/Fuzzing/AFL_Stats.PNG)
+![](/assets/images/Fuzzing/AFLStats.PNG)
 
 The AFL++ stats output has references to both paths and edges and implicitly 'counters'. I'm not 100% sure but I believe their definition of a 'path' matches up to ours above. I think they are saying that a 'path' is the same as a testcase in their documentation. 
 
