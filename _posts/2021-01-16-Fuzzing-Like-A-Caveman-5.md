@@ -246,7 +246,9 @@ does `0xbe` == `0xef` ? If so, log that we've matched both operands completely.
 In our **AFTER** rewrite, instead of getting a binary PASS/FAIL, we instead see that we progressed 75% of the way through the comparison matching 3 out of 4 bytes. Now we know that we can save this input and mutate it further hoping that we can pass the final byte comparison with a correct mutation.
 
 We also aren't restricted to only breaking down each comparison to bytes, we could instead compare the two operands at the bit-level. For instance we could've also compared them as follows:
+
 `1101 1110 1010 1101 1011 1110 1110 1111` vs
+
 `1101 1110 1010 1101 1011 1110 1011 1110`
 
 This could be broken down into 32 separate comparisons instead of our 4, giving us even more fidelity and progress tracking (probably at the expense of performance in practice). 
