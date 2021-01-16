@@ -146,8 +146,6 @@ Cleared       1000000 breakpoints in   0.067024 seconds | 14920028.6 / second
 Hit            100000 breakpoints in  10.066440 seconds |     9934.0 / second
 ```
 
-With performance like this with regards to registering/applying breakpoints, you probably wouldn't have to keep the target in-memory. It could actually be restarted each iteration and you probably would be pretty far off from bottlenecking on breakpoint application but I'm not 100% sure on this. 
-
 One thing to keep in mind is that if you use this way of collecting coverage data, you might limit yourself to the first input that reaches a basic block. Say for instance we have the following code:
 
 ```c
@@ -248,8 +246,8 @@ does `0xbe` == `0xef` ? If so, log that we've matched both operands completely.
 In our **AFTER** rewrite, instead of getting a binary PASS/FAIL, we instead see that we progressed 75% of the way through the comparison matching 3 out of 4 bytes. Now we know that we can save this input and mutate it further hoping that we can pass the final byte comparison with a correct mutation.
 
 We also aren't restricted to only breaking down each comparison to bytes, we could instead compare the two operands at the bit-level. For instance we could've also compared them as follows:
-
-`0b1110101011011011111010111110` vs `0b11011110101011011011111011101111` 
+`1101 1110 1010 1101 1011 1110 1110 1111` vs
+`1101 1110 1010 1101 1011 1110 1011 1110`
 
 This could be broken down into 32 separate comparisons instead of our 4, giving us even more fidelity and progress tracking (probably at the expense of performance in practice). 
 
