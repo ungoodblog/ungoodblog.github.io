@@ -304,7 +304,7 @@ There are some other tools out there that work similarly in theory to TinyInst a
 
 It should also be mentioned that AFL++ also has the ability to do compare coverage tracking even in QEMU mode. 
 
-## Bonus Land: Using Hardware to get Coverage Data
+## Bonus Land: Using Hardware to Get Coverage Data
 
 That pretty much wraps up the very basics of what type of data we're interested in, why, and how we might be able to extract it. One type of data extraction method that didn't come up yet that is particularly helpful for binary-only targets is utilizing your actual hardware to get coverage data.
 
@@ -319,6 +319,3 @@ There are many other such utilities but they are beyond the scope of this introd
 ## Conclusion
 
 In this post we went over some of the building-block terminology used in the space, some very common fundamental strategies that are employed to get meaningful coverage data, and also some of the tooling that is used to extract the data (and in some cases what fuzzing frameworks use what tooling). It should be mentioned that the popular fuzzing frameworks like AFL++ and honggfuzz go through great lengths to make their frameworks as flexible as possible and work with a wide breadth of targets. They often give you tons of flexibility to employ the coverage data extraction method that's best suited to your situation. Hopefully this was somewhat helpful to begin to understand some of the problems associated with code coverage as it relates to fuzzing.
-
-
-
