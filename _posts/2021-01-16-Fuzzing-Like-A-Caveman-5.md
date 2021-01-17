@@ -177,11 +177,11 @@ The AFL++ stats output has references to both paths and edges and implicitly 'co
 
 I won't get too in-depth here analyzing how AFL and its children (really AFL++ is quite different than AFL) collect and analyze coverage for a simple reason: it's for big brain people and I don't understand much of it. If you're interested in a more detailed breakdown, head on over to their docs and have a blast. 
 
-To track edges, AFL uses tuples of the block addresses involved in the relationship. So in our example program, if we went from block `0x001006cf` to block `0x001006e4` because we didn't provide the correct number of command line arguments, this tuple (`0x001006cf` , `0x001006e4`)  would be added to a bitmap that AFL++ uses to track unique tuples. I'm pretty sure this works out to be something similar to a graph where you have two Axis, and AFL++ would take this tuple, and look up the value of the bit stored at those coordinates. If that bit is, let's say unset, that means this tuple has never been seen before and AFL++ would flip that bit to set and log that it has now been seen and save the input as reaching new coverage. So let's track the tuples we would register if we traversed an entire path in our program:
+To track edges, AFL uses tuples of the block addresses involved in the relationship. So in our example program, if we went from block `0x001006cf` to block `0x001006e4` because we didn't provide the correct number of command line arguments, this tuple (`0x001006cf` , `0x001006e4`)  would be added to a coverage map AFL++ uses to track unique paths. So let's track the tuples we would register if we traversed an entire path in our program:
 
 `0x001006cf` -> `0x00100706` -> `0x00100722` 
 
-If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf` ,`0x00100706`) and (`0x00100706` -> `0x00100722`). These can be looked up in the bitmap to determine if they have been seen before. 
+If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf` ,`0x00100706`) and (`0x00100706` -> `0x00100722`). These can be looked up in AFL's coverage data to see if these relationships have been explored before. All of these edges are then combined and hashed in a way that produces coverage data for the entire path taken by the input. 
 
 Not only does AFL track these relationships, it also tracks frequency. So for instance, it is aware of how often each particular edge is reached and explored.
 
