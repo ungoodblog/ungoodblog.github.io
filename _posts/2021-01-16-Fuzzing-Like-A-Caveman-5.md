@@ -95,7 +95,7 @@ Basic block `001006cf` has a relationship with two different blocks: `001006e4` 
 
 These two possibilities can be referred to as 'Edges', so block `01006cf` has two edges. You can imagine how this might be important from the perspective of fuzzing. If our fuzzer is only ever exploring one of a basic block's edges, we are leaving an entire branch untested so it would behoove us to track this type of information. 
 
-There's apparently much more to this concept that I let on here, you can read more on the Wikipedia entry for [Control-flow_graph](https://en.wikipedia.org/wiki/Control-flow_graph). 
+There's apparently much more to this concept than I let on here, you can read more on the Wikipedia entry for [Control-flow_graph](https://en.wikipedia.org/wiki/Control-flow_graph). 
 
 ### Paths
 
@@ -181,7 +181,7 @@ To track edges, AFL uses tuples of the block addresses involved in the relations
 
 `0x001006cf` -> `0x00100706` -> `0x00100722` 
 
-If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf` ,`0x00100706`) and (`0x00100706` -> `0x00100722`). These can be looked up in AFL's coverage data to see if these relationships have been explored before. 
+If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf`, `0x00100706`) and (`0x00100706`, `0x00100722`). These can be looked up in AFL's coverage data to see if these relationships have been explored before. 
 
 Not only does AFL track these relationships, it also tracks frequency. So for instance, it is aware of how often each particular edge is reached and explored.
 
@@ -210,9 +210,6 @@ JMP RAX
 ```
 
 The only issue with using QEMU to gather our coverage data is it is relatively slow compared to purely native execution. This slowdown can be worth it obviously as the amount of data you get is substantial and sometimes with binary-only targets there are no other alternatives. 
-
-
-
 
 
 ### Compare Coverage/Compare Shattering
