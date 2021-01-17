@@ -181,7 +181,7 @@ To track edges, AFL uses tuples of the block addresses involved in the relations
 
 `0x001006cf` -> `0x00100706` -> `0x00100722` 
 
-If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf` ,`0x00100706`) and (`0x00100706` -> `0x00100722`). These can be looked up in AFL's coverage data to see if these relationships have been explored before. All of these edges are then combined and hashed in a way that produces coverage data for the entire path taken by the input. 
+If we take the above path, we can formulate two tuples of coverage data: (`0x001006cf` ,`0x00100706`) and (`0x00100706` -> `0x00100722`). These can be looked up in AFL's coverage data to see if these relationships have been explored before. 
 
 Not only does AFL track these relationships, it also tracks frequency. So for instance, it is aware of how often each particular edge is reached and explored.
 
