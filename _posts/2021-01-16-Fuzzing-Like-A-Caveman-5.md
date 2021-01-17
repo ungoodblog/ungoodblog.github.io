@@ -315,7 +315,6 @@ While it's not really a 'strategy' as the others were, it enables the execution 
 There are many other such utilities but they are beyond the scope of this introductory blogpost. 
 
 
-
 ## Conclusion
 
 In this post we went over some of the building-block terminology used in the space, some very common fundamental strategies that are employed to get meaningful coverage data, and also some of the tooling that is used to extract the data (and in some cases what fuzzing frameworks use what tooling). It should be mentioned that the popular fuzzing frameworks like AFL++ and honggfuzz go through great lengths to make their frameworks as flexible as possible and work with a wide breadth of targets. They often give you tons of flexibility to employ the coverage data extraction method that's best suited to your situation. Hopefully this was somewhat helpful to begin to understand some of the problems associated with code coverage as it relates to fuzzing.
